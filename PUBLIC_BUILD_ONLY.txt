@@ -1,0 +1,1 @@
+This public repository contains a generic, offline Android app shell only. It contains no private signing key, passwords, project records, or full dashboard. It builds an unsigned package to be finalized and signed privately after download.

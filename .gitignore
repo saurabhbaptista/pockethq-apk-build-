@@ -1,0 +1,6 @@
+private/
+*.keystore
+*.p12
+*.jks
+**/build/
+.gradle/
