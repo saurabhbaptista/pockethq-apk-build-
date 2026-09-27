@@ -124,7 +124,113 @@ public final class MainActivity extends Activity {
         }
     }
 
+
+    // Read-only bridge. Sends NO private app data to GitHub.
+    private static final String OFA_GITHUB_API =
+        "https://api.github.com/repos/saurabhbaptista/pockethq-apk-build-";
+
+    private String fetchOFAEndpoint(String path) throws IOException {
+        if (!"/actions/runs?per_page=15".equals(path) &&
+            !"/issues?state=open&per_page=80".equals(path)) {
+            throw new IOException("Endpoint not permitted");
+        }
+        java.net.HttpURLConnection connection = (java.net.HttpURLConnection)
+                new java.net.URL(OFA_GITHUB_API + path).openConnection();
+        connection.setRequestMethod("GET");
+        connection.setConnectTimeout(8000);
+        connection.setReadTimeout(8000);
+        connection.setRequestProperty("Accept", "application/vnd.github+json");
+        connection.setRequestProperty("User-Agent", "OFA-Android-1.6");
+        try {
+            if (connection.getResponseCode() != 200) {
+                throw new IOException("GitHub public API returned HTTP " + connection.getResponseCode());
+            }
+            try (InputStream stream = connection.getInputStream();
+                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[8192]; int n;
+                while ((n = stream.read(buffer)) != -1) {
+                    if (output.size() + n > 850000) throw new IOException("Public API response too large");
+                    output.write(buffer, 0, n);
+                }
+                return output.toString("UTF-8");
+            }
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private String publicWatchtowerSnapshot() throws Exception {
+        org.json.JSONObject result = new org.json.JSONObject();
+        result.put("fetchedAt", new java.text.SimpleDateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US) {{
+                setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            }}.format(new java.util.Date()));
+        org.json.JSONObject runs = new org.json.JSONObject(
+            fetchOFAEndpoint("/actions/runs?per_page=15"));
+        org.json.JSONArray items = runs.optJSONArray("workflow_runs");
+        if (items != null) for (int i = 0; i < items.length(); ++i) {
+            org.json.JSONObject run = items.optJSONObject(i);
+            if (run == null ||
+                !"Build Pocket HQ offline Android shell".equals(run.optString("name")) ||
+                !"completed".equals(run.optString("status"))) continue;
+            org.json.JSONObject latest = new org.json.JSONObject();
+            latest.put("runId", run.optLong("id"));
+            latest.put("conclusion", run.optString("conclusion", "unknown"));
+            latest.put("attempt", run.optInt("run_attempt", 1));
+            latest.put("updatedAt", run.optString("updated_at", ""));
+            latest.put("commit", run.optString("head_sha", ""));
+            result.put("build", latest);
+            break;
+        }
+        org.json.JSONArray issues = new org.json.JSONArray(
+            fetchOFAEndpoint("/issues?state=open&per_page=80"));
+        org.json.JSONArray incidents = new org.json.JSONArray();
+        org.json.JSONObject heartbeat = null;
+        for (int i = 0; i < issues.length(); ++i) {
+            org.json.JSONObject issue = issues.optJSONObject(i);
+            if (issue == null) continue;
+            String title = issue.optString("title", "");
+            if (title.startsWith("[OFA] Watchtower")) {
+                heartbeat = new org.json.JSONObject();
+                heartbeat.put("number", issue.optInt("number"));
+                heartbeat.put("updatedAt", issue.optString("updated_at", ""));
+            } else if (title.startsWith("[OFA] Engineering")) {
+                org.json.JSONObject incident = new org.json.JSONObject();
+                incident.put("number", issue.optInt("number"));
+                incident.put("title", title.length() > 120 ? title.substring(0, 120) : title);
+                incident.put("createdAt", issue.optString("created_at", ""));
+                incidents.put(incident);
+            }
+            if (incidents.length() >= 15) break;
+        }
+        result.put("heartbeat", heartbeat == null ? org.json.JSONObject.NULL : heartbeat);
+        result.put("incidents", incidents);
+        result.put("scope", "PUBLIC_GITHUB_BUILD_ONLY");
+        return result.toString();
+    }
+
     private final class BackupBridge {
+        @JavascriptInterface public void refreshOFABuildStatus() {
+            diskExecutor.execute(() -> {
+                String payload;
+                try { payload = publicWatchtowerSnapshot(); }
+                catch (Exception error) {
+                    org.json.JSONObject failure = new org.json.JSONObject();
+                    try {
+                        failure.put("error", "Cannot reach public GitHub Watchtower. " +
+                            (error instanceof IOException ? error.getMessage() : "Retry later."));
+                    } catch (Exception ignored) { }
+                    payload = failure.toString();
+                }
+                final String safeJs = "window.OFAWatchtowerReceive(" +
+                    org.json.JSONObject.quote(payload) + ");";
+                runOnUiThread(() -> {
+                    if (!isFinishing() && webView != null)
+                        webView.evaluateJavascript(safeJs, null);
+                });
+            });
+        }
+
         @JavascriptInterface public void updateWidget(String compactStateJson) {
             if (compactStateJson == null || compactStateJson.length() > 5000) return;
             try {
