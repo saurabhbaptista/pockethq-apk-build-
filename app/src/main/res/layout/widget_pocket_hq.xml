@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_container"
+    android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:padding="16dp" android:background="@drawable/widget_background">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="POCKET HQ  ·  CURRENT FOCUS" android:textColor="#a6ecd7" android:fontFamily="sans"
+        android:textStyle="bold" android:textSize="11sp" android:letterSpacing="0.12"/>
+    <TextView android:id="@+id/widget_focus" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="Open Pocket HQ"
+        android:fontFamily="sans" android:textSize="23sp" android:textStyle="bold"
+        android:textColor="#eff5f3" android:singleLine="true" android:ellipsize="end"
+        android:layout_marginTop="5dp"/>
+    <TextView android:id="@+id/widget_next" android:layout_width="match_parent"
+        android:layout_height="0dp" android:layout_weight="1" android:text="Open the app once to load your current focus."
+        android:fontFamily="sans" android:textSize="13sp" android:textColor="#c1d0d0"
+        android:ellipsize="end" android:maxLines="3" android:layout_marginTop="4dp"/>
+    <TextView android:id="@+id/widget_stats" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="Offline · No credits"
+        android:textSize="11sp" android:fontFamily="sans" android:textColor="#a6ecd7"
+        android:layout_marginTop="4dp"/>
+</LinearLayout>

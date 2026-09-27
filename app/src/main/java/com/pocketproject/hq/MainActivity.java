@@ -125,6 +125,15 @@ public final class MainActivity extends Activity {
     }
 
     private final class BackupBridge {
+        @JavascriptInterface public void updateWidget(String compactStateJson) {
+            if (compactStateJson == null || compactStateJson.length() > 5000) return;
+            try {
+                WidgetProvider.updateSnapshot(MainActivity.this, compactStateJson);
+            } catch (Exception ex) {
+                Log.w(TAG, "Widget update failed", ex);
+            }
+        }
+
         @JavascriptInterface public void saveBase64(String proposedName, String mimeType, String encoded) {
             if (!saving.compareAndSet(false, true)) { notifyUser("A save dialog is already open."); return; }
             if (encoded == null || encoded.length() > (MAX_EXPORT_BYTES * 4 / 3 + 256)) {
