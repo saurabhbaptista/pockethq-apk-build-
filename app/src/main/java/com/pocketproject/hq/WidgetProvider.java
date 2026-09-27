@@ -65,12 +65,15 @@ public final class WidgetProvider extends AppWidgetProvider {
         v.setTextViewText(R.id.widget_active, String.valueOf(clamp(s.optInt("active", 0))));
         v.setTextViewText(R.id.widget_queued, String.valueOf(clamp(s.optInt("queued", 0))));
         v.setTextViewText(R.id.widget_done, String.valueOf(clamp(s.optInt("done", 0))));
-        v.setTextViewText(R.id.widget_build, limit(s.optString("doingBuild",
-                s.optString("queuedBuild", "No build selected")), 85));
+        String doing = s.optString("doingBuild", "");
+        String queued = s.optString("queuedBuild", "");
+        String buildTitle = doing.length() > 0 ? doing
+            : (queued.length() > 0 ? queued : "No build selected");
+        v.setTextViewText(R.id.widget_build, limit(buildTitle, 85));
         v.setTextViewText(R.id.widget_build_status,
-            s.has("doingBuild") && s.optString("doingBuild").length() > 0 ? "IN PROGRESS" : "UP NEXT");
+            doing.length() > 0 ? "IN PROGRESS" : "UP NEXT");
         v.setTextViewText(R.id.widget_upcoming,
-            limit(s.optString("queuedBuild", "Nothing else in the queue"), 85));
+            limit(s.optString("followingBuild", "Nothing else in the queue"), 85));
         v.setTextViewText(R.id.widget_recent,
             limit(s.optString("recentActivity", "No recent activity"), 125));
         String updated = limit(s.optString("lastUpdated", "Open app to refresh"), 55);
