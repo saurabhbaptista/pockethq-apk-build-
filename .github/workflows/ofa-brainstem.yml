@@ -1,0 +1,56 @@
+name: OFA Brainstem - GitHub Watchtower
+on:
+  workflow_run:
+    workflows: [Build Pocket HQ offline Android shell]
+    types: [completed]
+  schedule:
+    - cron: '19,49 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run offline tests or inspect latest completed public build"
+        type: choice
+        options: [sweep, test]
+        default: sweep
+permissions:
+  contents: read
+  actions: write
+  issues: write
+concurrency:
+  group: ofa-brainstem-main
+  cancel-in-progress: false
+jobs:
+  watchtower:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recover missing files in case of bootstrap race
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f ofa/brainstem.py ]; then
+            gzip -dc ofa/brainstem.py.gz > ofa/brainstem.py
+          fi
+          if [ ! -f tests/test_brainstem.py ]; then
+            gzip -dc tests/test_brainstem.py.gz > tests/test_brainstem.py
+          fi
+          echo '0c57b61a1991250c7af9cecfb178a87d7e07a067fdc7003da90440481bb8f31e  ofa/brainstem.py' | sha256sum --check
+          echo '5cfae69f2921f43ee279161c3219ecc2d05083ca74847dd43ad1e898ae0b156b  tests/test_brainstem.py' | sha256sum --check
+      - name: Unit tests - no secrets or external access
+        env:
+          GITHUB_TOKEN: ''
+        run: python -m unittest discover -s tests -p test_brainstem.py -v
+      - name: Chief of Staff - investigate and take bounded actions
+        if: github.event.inputs.mode != 'test'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OFA_MODE: ${{ github.event_name == 'workflow_run' && 'event' || 'sweep' }}
+          OFA_ALLOW_ONE_TRANSIENT_RETRY: '1'
+        run: python ofa/brainstem.py
