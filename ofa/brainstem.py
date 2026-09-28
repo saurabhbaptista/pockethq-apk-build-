@@ -14,7 +14,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-WORKFLOW_NAME = "Build Pocket HQ offline Android shell"
+WORKFLOW_NAME = "Build Pocket HQ offline Android shell"\nWORKFLOW_PATH = ".github/workflows/build-pocket-hq.yml"
 STATUS_MARKER = "<!-- OFA-STATUS-V1 -->"
 MANAGER_LOG_MARKER = "<!-- OFA-MANAGER-LOG-V1 -->"
 WORKER_LOG_MARKER = "<!-- OFA-WORKER-LOG-V1 -->"
@@ -198,7 +198,8 @@ class Chief:
     def process(self, run: dict, issues: list[dict] | None = None, *, record_dialogue: bool = False) -> None:
         # Treat webhook JSON as untrusted: exact source repo, branch, workflow and completion gate.
         source = (run.get("head_repository") or {}).get("full_name", "")
-        if (run.get("name") != WORKFLOW_NAME or source.lower() != self.api.repo.lower()
+        if (run.get("name") != WORKFLOW_NAME or run.get("path") != WORKFLOW_PATH
+            or source.lower() != self.api.repo.lower()
             or run.get("head_branch") != "main" or run.get("status") != "completed"):
             self.actions.append("Ignored an out-of-scope workflow event")
             return
