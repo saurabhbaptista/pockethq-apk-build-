@@ -11,7 +11,7 @@ REPO = "saurabhbaptista/pockethq-apk-build-"
 def example(conclusion="success", attempt=1, run_id=444):
     return dict(id=run_id, name="Build Pocket HQ offline Android shell",
                 head_repository={"full_name": REPO}, head_branch="main",
-                status="completed", conclusion=conclusion,
+                status="completed", conclusion=conclusion, path=".github/workflows/build-pocket-hq.yml",
                 run_attempt=attempt, head_sha="ab12" * 10)
 
 
@@ -76,10 +76,18 @@ class BrainstemTests(unittest.TestCase):
 
     def test_out_of_scope_or_forged_event_has_no_side_effects(self):
         for wrong in (dict(name="Not our workflow"),
-                      dict(head_repository={"full_name": "attacker/fork"}),
+                      dict(head_repository={"full_name": "attacker/fork"}),\n                      dict(path=".github/workflows/unrelated-build.yml"),
                       dict(head_branch="feature"), dict(status="in_progress")):
             self.chief.process({**example(), **wrong})
         self.assertEqual(self.api.entries, [])
+
+    def test_mixed_project_workflow_history_is_ignored(self):
+        unrelated = {**example(), "name": "ZapChicka temporary Android build",
+                     "path": ".github/workflows/zapchicka-temp-build.yml"}
+        self.chief.process(unrelated, record_dialogue=True)
+        self.assertEqual(self.api.entries, [])
+        self.assertEqual(self.api.comments, [])
+        self.assertIn("Ignored an out-of-scope workflow event", self.chief.actions)
 
     def test_failed_compile_creates_work_order_but_never_retries(self):
         self.api.mock_jobs = [dict(id=900, name="compile", conclusion="failure",
