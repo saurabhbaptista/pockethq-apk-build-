@@ -34,7 +34,14 @@ jobs:
           "$BT/aapt2" dump badging dist/PocketHQ_aligned_unsigned.apk
           cp "$BT/zipalign" dist/zipalign
           cp "$BT/lib/apksigner.jar" dist/apksigner.jar
-          sha256sum dist/* > dist/SHA256SUMS.txt
+          mkdir -p dist/lib64
+          if [ -f "$BT/lib64/libc++.so" ]; then
+            cp "$BT/lib64/libc++.so" dist/lib64/libc++.so
+          else
+            echo "zipalign runtime dependency libc++.so was not found" >&2
+            exit 1
+          fi
+          sha256sum dist/PocketHQ_aligned_unsigned.apk dist/zipalign dist/apksigner.jar dist/lib64/libc++.so > dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: pockethq-standard-unsigned-build
