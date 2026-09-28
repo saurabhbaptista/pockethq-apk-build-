@@ -68,16 +68,15 @@ public final class WidgetProvider extends AppWidgetProvider {
         String doing = s.optString("doingBuild", "");
         String queued = s.optString("queuedBuild", "");
         String buildTitle = doing.length() > 0 ? doing
-            : (queued.length() > 0 ? queued : "No build selected");
+            : (queued.length() > 0 ? queued : "No current organizational focus");
         v.setTextViewText(R.id.widget_build, limit(buildTitle, 85));
-        v.setTextViewText(R.id.widget_build_status,
-            doing.length() > 0 ? "IN PROGRESS" : "UP NEXT");
+        v.setTextViewText(R.id.widget_build_status, "CURRENT FOCUS");
         v.setTextViewText(R.id.widget_upcoming,
             limit(s.optString("followingBuild", "Nothing else in the queue"), 85));
         v.setTextViewText(R.id.widget_recent,
             limit(s.optString("recentActivity", "No recent activity"), 125));
         String updated = limit(s.optString("lastUpdated", "Open app to refresh"), 55);
-        v.setTextViewText(R.id.widget_updated, "LOCAL SNAPSHOT  \u00B7  " + updated);
+        v.setTextViewText(R.id.widget_updated, "OFA SNAPSHOT  \u00B7  " + updated);
 
         Bundle opts = manager.getAppWidgetOptions(id);
         int height = Math.max(opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0),
