@@ -21,6 +21,12 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.Toast;
+import android.content.SharedPreferences;
+import java.security.MessageDigest;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,6 +48,9 @@ public final class MainActivity extends Activity {
     private byte[] pendingExport;
     private final AtomicBoolean saving = new AtomicBoolean(false);
     private final ExecutorService diskExecutor = Executors.newSingleThreadExecutor();
+    private static final String OFA_CLOUD_PREFS = "ofa.cloud.session.v1";
+    private static final String OFA_ALLOWED_BASE_SHA256 = "65f21056a7092d5dd1a2fd49c5efbf86ff6245952301e50dd51dd5f9a9280f37";
+    private SharedPreferences cloudPrefs;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -103,7 +112,9 @@ public final class MainActivity extends Activity {
                 }
             }
         });
+        cloudPrefs = getSharedPreferences(OFA_CLOUD_PREFS, MODE_PRIVATE);
         webView.addJavascriptInterface(new BackupBridge(), "PocketNative");
+        webView.addJavascriptInterface(new OFACloudBridge(), "OFACloud");
         try {
             webView.loadDataWithBaseURL(LOCAL_BASE, readBundledHtml(), "text/html", "UTF-8", null);
         } catch (IOException ex) {
@@ -239,6 +250,273 @@ public final class MainActivity extends Activity {
         return result.toString();
     }
 
+
+    private static String sha256(String value) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] raw = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+        StringBuilder out = new StringBuilder();
+        for (byte b : raw) out.append(String.format(java.util.Locale.ROOT, "%02x", b & 0xff));
+        return out.toString();
+    }
+
+    private String cloudBase() throws Exception {
+        String base = cloudPrefs.getString("base_url", "");
+        if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        if (!OFA_ALLOWED_BASE_SHA256.equals(sha256(base))) throw new IOException("OFA private backend is not configured");
+        return base;
+    }
+
+    private String cloudKey() throws IOException {
+        String key = cloudPrefs.getString("publishable_key", "");
+        if (!(key.startsWith("sb_publishable_") || key.split("\\.").length == 3)) {
+            throw new IOException("OFA publishable key is not configured");
+        }
+        return key;
+    }
+
+    private JSONObject httpJson(String method, String path, JSONObject body, boolean authenticated) throws Exception {
+        String base = cloudBase();
+        if (!path.startsWith("/auth/v1/") && !path.startsWith("/rest/v1/")) {
+            throw new IOException("OFA endpoint not permitted");
+        }
+        HttpURLConnection connection = (HttpURLConnection) new URL(base + path).openConnection();
+        connection.setRequestMethod(method);
+        connection.setConnectTimeout(10000);
+        connection.setReadTimeout(12000);
+        connection.setRequestProperty("apikey", cloudKey());
+        connection.setRequestProperty("Accept", "application/json");
+        if (authenticated) {
+            String token = ensureAccessToken();
+            if (token.isEmpty()) throw new IOException("Sign in to OFA first");
+            connection.setRequestProperty("Authorization", "Bearer " + token);
+        }
+        if (body != null) {
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+            byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
+            try (OutputStream out = connection.getOutputStream()) { out.write(bytes); }
+        }
+        int code = connection.getResponseCode();
+        InputStream stream = code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        if (stream != null) {
+            try (InputStream in = stream) {
+                byte[] buffer = new byte[8192]; int count;
+                while ((count = in.read(buffer)) != -1) {
+                    if (out.size() + count > 2200000) throw new IOException("OFA response too large");
+                    out.write(buffer, 0, count);
+                }
+            }
+        }
+        connection.disconnect();
+        String raw = new String(out.toByteArray(), StandardCharsets.UTF_8).trim();
+        if (code < 200 || code >= 300) {
+            String detail = "HTTP " + code;
+            try {
+                JSONObject e = raw.isEmpty() ? new JSONObject() : new JSONObject(raw);
+                detail = e.optString("msg", e.optString("message", e.optString("error_description", detail)));
+            } catch (Exception ignored) { }
+            throw new IOException(detail.length() > 180 ? detail.substring(0,180) : detail);
+        }
+        if (raw.isEmpty()) return new JSONObject();
+        if (raw.startsWith("[")) return new JSONObject().put("items", new JSONArray(raw));
+        return new JSONObject(raw);
+    }
+
+    private String ensureAccessToken() throws Exception {
+        long expiresAt = cloudPrefs.getLong("expires_at_ms", 0L);
+        String access = cloudPrefs.getString("access_token", "");
+        if (!access.isEmpty() && System.currentTimeMillis() + 60000L < expiresAt) return access;
+        String refresh = cloudPrefs.getString("refresh_token", "");
+        if (refresh.isEmpty()) return access;
+        JSONObject response = httpJsonNoAuth("POST", "/auth/v1/token?grant_type=refresh_token",
+            new JSONObject().put("refresh_token", refresh));
+        saveSession(response);
+        return cloudPrefs.getString("access_token", "");
+    }
+
+    private JSONObject httpJsonNoAuth(String method, String path, JSONObject body) throws Exception {
+        String base = cloudBase();
+        if (!path.startsWith("/auth/v1/")) throw new IOException("Auth endpoint not permitted");
+        HttpURLConnection connection = (HttpURLConnection) new URL(base + path).openConnection();
+        connection.setRequestMethod(method);
+        connection.setConnectTimeout(10000);
+        connection.setReadTimeout(12000);
+        connection.setRequestProperty("apikey", cloudKey());
+        connection.setRequestProperty("Accept", "application/json");
+        if (body != null) {
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+            byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
+            try (OutputStream out = connection.getOutputStream()) { out.write(bytes); }
+        }
+        int code = connection.getResponseCode();
+        InputStream stream = code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        if (stream != null) {
+            try (InputStream in = stream) {
+                byte[] buffer = new byte[8192]; int count;
+                while ((count = in.read(buffer)) != -1) {
+                    if (out.size() + count > 1000000) throw new IOException("Auth response too large");
+                    out.write(buffer, 0, count);
+                }
+            }
+        }
+        connection.disconnect();
+        String raw = new String(out.toByteArray(), StandardCharsets.UTF_8).trim();
+        if (code < 200 || code >= 300) {
+            String detail = "HTTP " + code;
+            try {
+                JSONObject e = raw.isEmpty() ? new JSONObject() : new JSONObject(raw);
+                detail = e.optString("msg", e.optString("message", e.optString("error_description", detail)));
+            } catch (Exception ignored) { }
+            throw new IOException(detail.length() > 180 ? detail.substring(0,180) : detail);
+        }
+        return raw.isEmpty() ? new JSONObject() : new JSONObject(raw);
+    }
+
+    private void saveSession(JSONObject response) {
+        String access = response.optString("access_token", "");
+        String refresh = response.optString("refresh_token", "");
+        long expiresIn = Math.max(60L, response.optLong("expires_in", 3600L));
+        JSONObject user = response.optJSONObject("user");
+        String email = user == null ? cloudPrefs.getString("email", "") : user.optString("email", "");
+        SharedPreferences.Editor edit = cloudPrefs.edit();
+        if (!access.isEmpty()) edit.putString("access_token", access).putLong("expires_at_ms", System.currentTimeMillis() + expiresIn * 1000L);
+        if (!refresh.isEmpty()) edit.putString("refresh_token", refresh);
+        if (!email.isEmpty()) edit.putString("email", email);
+        edit.apply();
+    }
+
+    private void cloudCallback(String kind, JSONObject payload) {
+        final String js = "window.OFACloudReceive(" + JSONObject.quote(kind) + "," +
+            JSONObject.quote(payload.toString()) + ");";
+        runOnUiThread(() -> {
+            if (!isFinishing() && webView != null) webView.evaluateJavascript(js, null);
+        });
+    }
+
+    private JSONObject cloudError(Exception error) {
+        String message = error.getMessage() == null ? "OFA private backend unavailable" : error.getMessage();
+        if (message.length() > 200) message = message.substring(0, 200);
+        try { return new JSONObject().put("ok", false).put("error", message); }
+        catch (Exception ignored) { return new JSONObject(); }
+    }
+
+    private final class OFACloudBridge {
+        @JavascriptInterface public boolean configure(String baseUrl, String publishableKey) {
+            try {
+                String normalized = String.valueOf(baseUrl == null ? "" : baseUrl).trim();
+                while (normalized.endsWith("/")) normalized = normalized.substring(0, normalized.length()-1);
+                if (!OFA_ALLOWED_BASE_SHA256.equals(sha256(normalized))) return false;
+                if (publishableKey == null || !publishableKey.startsWith("sb_publishable_")) return false;
+                cloudPrefs.edit().putString("base_url", normalized)
+                    .putString("publishable_key", publishableKey).apply();
+                return true;
+            } catch (Exception e) { return false; }
+        }
+
+        @JavascriptInterface public String authState() {
+            try {
+                JSONObject result = new JSONObject();
+                result.put("configured", !cloudPrefs.getString("base_url","").isEmpty());
+                result.put("signedIn", !cloudPrefs.getString("access_token","").isEmpty() ||
+                    !cloudPrefs.getString("refresh_token","").isEmpty());
+                result.put("email", cloudPrefs.getString("email",""));
+                return result.toString();
+            } catch (Exception e) { return "{\"configured\":false,\"signedIn\":false}"; }
+        }
+
+        @JavascriptInterface public void signUp(String email, String password) {
+            diskExecutor.execute(() -> {
+                try {
+                    JSONObject response = httpJsonNoAuth("POST", "/auth/v1/signup",
+                        new JSONObject().put("email", String.valueOf(email).trim())
+                            .put("password", String.valueOf(password)));
+                    saveSession(response);
+                    JSONObject result = new JSONObject().put("ok", true);
+                    result.put("signedIn", !response.optString("access_token","").isEmpty());
+                    result.put("needsEmailConfirmation", response.optString("access_token","").isEmpty());
+                    JSONObject user = response.optJSONObject("user");
+                    if (user != null) result.put("email", user.optString("email",""));
+                    cloudCallback("auth", result);
+                } catch (Exception e) { cloudCallback("auth", cloudError(e)); }
+            });
+        }
+
+        @JavascriptInterface public void signIn(String email, String password) {
+            diskExecutor.execute(() -> {
+                try {
+                    JSONObject response = httpJsonNoAuth("POST", "/auth/v1/token?grant_type=password",
+                        new JSONObject().put("email", String.valueOf(email).trim())
+                            .put("password", String.valueOf(password)));
+                    saveSession(response);
+                    cloudCallback("auth", new JSONObject().put("ok", true).put("signedIn", true)
+                        .put("email", cloudPrefs.getString("email","")));
+                } catch (Exception e) { cloudCallback("auth", cloudError(e)); }
+            });
+        }
+
+        @JavascriptInterface public void signOut() {
+            diskExecutor.execute(() -> {
+                try {
+                    String token = cloudPrefs.getString("access_token","");
+                    if (!token.isEmpty()) {
+                        try { httpJson("POST", "/auth/v1/logout", new JSONObject(), true); }
+                        catch (Exception ignored) { }
+                    }
+                } finally {
+                    cloudPrefs.edit().remove("access_token").remove("refresh_token")
+                        .remove("expires_at_ms").remove("email").apply();
+                    try { cloudCallback("auth", new JSONObject().put("ok", true).put("signedIn", false)); }
+                    catch (Exception ignored) { }
+                }
+            });
+        }
+
+        @JavascriptInterface public void refreshOffice() {
+            diskExecutor.execute(() -> {
+                try {
+                    JSONObject result = new JSONObject();
+                    result.put("ok", true);
+                    result.put("email", cloudPrefs.getString("email",""));
+                    result.put("agents", httpJson("GET",
+                        "/rest/v1/ofa_agents?select=code,name,department,role,status,authority_level,last_heartbeat_at&order=department.asc,name.asc",
+                        null, true).optJSONArray("items"));
+                    result.put("tasks", httpJson("GET",
+                        "/rest/v1/ofa_tasks?select=id,idempotency_key,objective,department,status,priority,risk_tier,authority_required,result_summary,error_summary,updated_at&order=priority.desc&limit=100",
+                        null, true).optJSONArray("items"));
+                    result.put("channels", httpJson("GET",
+                        "/rest/v1/ofa_channels?select=id,key,name,channel_type&order=created_at.asc",
+                        null, true).optJSONArray("items"));
+                    result.put("messages", httpJson("GET",
+                        "/rest/v1/ofa_messages?select=id,channel_id,sender_kind,sender_ref,message_type,body,created_at&order=created_at.desc&limit=160",
+                        null, true).optJSONArray("items"));
+                    result.put("events", httpJson("GET",
+                        "/rest/v1/ofa_events?select=id,event_type,summary,created_at&order=created_at.desc&limit=100",
+                        null, true).optJSONArray("items"));
+                    result.put("approvals", httpJson("GET",
+                        "/rest/v1/ofa_approvals?select=id,task_id,action_type,action_summary,status,created_at,expires_at&order=created_at.desc&limit=60",
+                        null, true).optJSONArray("items"));
+                    result.put("fetchedAt", System.currentTimeMillis());
+                    cloudCallback("office", result);
+                } catch (Exception e) { cloudCallback("office", cloudError(e)); }
+            });
+        }
+
+        @JavascriptInterface public void sendChiefMessage(String message) {
+            diskExecutor.execute(() -> {
+                try {
+                    String clean = String.valueOf(message == null ? "" : message).trim();
+                    if (clean.isEmpty() || clean.length() > 12000) throw new IOException("Message must be 1–12000 characters");
+                    JSONObject response = httpJson("POST", "/rest/v1/rpc/ofa_ceo_message_to_chief",
+                        new JSONObject().put("message_text", clean), true);
+                    cloudCallback("chief-message", new JSONObject().put("ok", true).put("result", response));
+                } catch (Exception e) { cloudCallback("chief-message", cloudError(e)); }
+            });
+        }
+    }
+
     private final class BackupBridge {
         @JavascriptInterface public void refreshOFABuildStatus() {
             diskExecutor.execute(() -> {
@@ -346,6 +624,7 @@ public final class MainActivity extends Activity {
         if (pendingImport != null) { pendingImport.onReceiveValue(null); pendingImport = null; }
         if (webView != null) {
             webView.removeJavascriptInterface("PocketNative");
+            webView.removeJavascriptInterface("OFACloud");
             if (webView.getParent() instanceof android.view.ViewGroup) {
                 ((android.view.ViewGroup) webView.getParent()).removeView(webView);
             }
