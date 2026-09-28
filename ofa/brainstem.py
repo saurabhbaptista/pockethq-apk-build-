@@ -16,6 +16,8 @@ from typing import Any
 
 WORKFLOW_NAME = "Build Pocket HQ offline Android shell"
 STATUS_MARKER = "<!-- OFA-STATUS-V1 -->"
+MANAGER_LOG_MARKER = "<!-- OFA-MANAGER-LOG-V1 -->"
+WORKER_LOG_MARKER = "<!-- OFA-WORKER-LOG-V1 -->"
 INCIDENT_PREFIX = "<!-- OFA-INCIDENT-RUN:"
 TRANSIENT = (
     "502 Bad Gateway", "503 Service Unavailable", "ECONNRESET",
@@ -116,6 +118,30 @@ class Chief:
         self.api = api
         self.actions: list[str] = []
 
+    def ensure_log(self, issues: list[dict], marker: str, title: str, intro: str) -> dict:
+        existing = next((i for i in issues if marker in (i.get("body") or "")), None)
+        if existing:
+            return existing
+        created = self.api.create_issue(title, f"{marker}\n# {title}\n\n{intro}\n")
+        issues.append(created)
+        return created
+
+    def manager_log(self, issues: list[dict], message: str) -> None:
+        channel = self.ensure_log(
+            issues, MANAGER_LOG_MARKER, "[OFA] Chief ↔ Managers · public engineering channel",
+            "Public-safe executive coordination for the GitHub build pilot. "
+            "No private project data, credentials or confidential business material.")
+        self.api.comment(channel["number"],
+            f"**{utcnow()} UTC · Chief / Manager channel**\n\n{sanitize(message, 1200)}")
+
+    def worker_log(self, issues: list[dict], message: str) -> None:
+        channel = self.ensure_log(
+            issues, WORKER_LOG_MARKER, "[OFA] Workers · public engineering channel",
+            "Public-safe worker activity for the GitHub build pilot. "
+            "This is evidence of bounded automation, not private workforce chat.")
+        self.api.comment(channel["number"],
+            f"**{utcnow()} UTC · Worker channel**\n\n{sanitize(message, 1200)}")
+
     def status(self, issues: list[dict], run: dict | None, *, note: str) -> dict:
         marker = STATUS_MARKER
         old = next((i for i in issues if marker in (i.get("body") or "")), None)
@@ -169,7 +195,7 @@ class Chief:
                     safe_to_retry = False
         return problems[:8], safe_to_retry
 
-    def process(self, run: dict, issues: list[dict] | None = None) -> None:
+    def process(self, run: dict, issues: list[dict] | None = None, *, record_dialogue: bool = False) -> None:
         # Treat webhook JSON as untrusted: exact source repo, branch, workflow and completion gate.
         source = (run.get("head_repository") or {}).get("full_name", "")
         if (run.get("name") != WORKFLOW_NAME or source.lower() != self.api.repo.lower()
@@ -183,12 +209,18 @@ class Chief:
             issues = self.api.issues()
         incident = self.find_incident(issues, run_id)
         if result == "success":
+            if record_dialogue:
+                self.worker_log(issues, f"Watchtower observed completed Android build run {run_id}, attempt {attempt}: SUCCESS.")
             if incident and incident.get("state") == "open":
                 self.api.comment(incident["number"],
                     f"QA confirmation: the SAME workflow run succeeded on attempt {attempt}. "
                     "Closing this incident; no automatic code modifications were made.")
                 self.api.edit_issue(incident["number"], state="closed")
                 self.actions.append(f"Resolved incident #{incident['number']}")
+                if record_dialogue:
+                    self.manager_log(issues, f"QA confirmed the retried build succeeded. Incident #{incident['number']} closed; no automatic code patch was applied.")
+            elif record_dialogue:
+                self.manager_log(issues, f"Build run {run_id} succeeded. Engineering Manager: no intervention required.")
             self.status(issues, run, note="Build succeeded. No manager intervention required.")
             return
         if result != "failure":
@@ -200,6 +232,8 @@ class Chief:
             self.status(issues, run, note="Failure persists or retry in progress.")
             return
         problems, transient = self.diagnose(run_id)
+        if record_dialogue:
+            self.worker_log(issues, "Watchtower detected a failed Android build. Evidence: " + "; ".join(problems[:4]))
         allowed = transient and attempt == 1 and os.getenv("OFA_ALLOW_ONE_TRANSIENT_RETRY") == "1"
         marker = f"{INCIDENT_PREFIX}{run_id} -->"
         url = f"https://github.com/{self.api.repo}/actions/runs/{run_id}"
@@ -217,6 +251,8 @@ class Chief:
                 f"Auto retry permitted: **{'yes' if allowed else 'no'}**.\n")
         created = self.api.create_issue("[OFA] Engineering · failed public Android build", body)
         self.actions.append(f"Assigned engineering work order #{created['number']}")
+        if record_dialogue:
+            self.manager_log(issues, f"Chief assigned Engineering work order #{created['number']} for failed run {run_id}. Automatic retry authorized: {'yes' if allowed else 'no'}.")
         if allowed:
             # The incident is committed BEFORE rerun; an unsuccessful API call does not loop.
             try:
@@ -251,7 +287,7 @@ def main() -> int:
         event_file = os.environ.get("GITHUB_EVENT_PATH", "")
         with open(event_file, encoding="utf-8") as file:
             event = json.load(file)
-        chief.process(event.get("workflow_run") or {})
+        chief.process(event.get("workflow_run") or {}, record_dialogue=True)
     elif mode == "sweep":
         chief.sweep()
     else:
