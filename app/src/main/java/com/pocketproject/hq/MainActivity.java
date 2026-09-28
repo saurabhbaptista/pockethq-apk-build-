@@ -140,6 +140,28 @@ public final class MainActivity extends Activity {
     private static final String OFA_GITHUB_API =
         "https://api.github.com/repos/saurabhbaptista/pockethq-apk-build-";
 
+    // Fixed public visualization grid for model cloud cover. This never sends device
+    // location or private OFA data. The final point anchors Chief to Abu Dhabi.
+    private static final double[] OFA_WEATHER_LAT = new double[] {
+        -60,-60,-60,-60,-60,-60,
+        -30,-30,-30,-30,-30,-30,
+          0,  0,  0,  0,  0,  0,
+         30, 30, 30, 30, 30, 30,
+         60, 60, 60, 60, 60, 60,
+         24.4539
+    };
+    private static final double[] OFA_WEATHER_LON = new double[] {
+        -150,-90,-30,30,90,150,
+        -150,-90,-30,30,90,150,
+        -150,-90,-30,30,90,150,
+        -150,-90,-30,30,90,150,
+        -150,-90,-30,30,90,150,
+        54.3773
+    };
+    private static final long OFA_WEATHER_CACHE_MS = 20L * 60L * 1000L;
+    private static final String OFA_WEATHER_CACHE_KEY = "ofa.weather.snapshot.v1";
+    private static final String OFA_WEATHER_TIME_KEY = "ofa.weather.fetched.v1";
+
     private String fetchOFAEndpoint(String path) throws IOException {
         if (!"/actions/runs?per_page=15".equals(path) &&
             !"/issues?state=open&per_page=80".equals(path) &&
@@ -152,7 +174,7 @@ public final class MainActivity extends Activity {
         connection.setConnectTimeout(8000);
         connection.setReadTimeout(8000);
         connection.setRequestProperty("Accept", "application/vnd.github+json");
-        connection.setRequestProperty("User-Agent", "OFA-Android-3.1");
+        connection.setRequestProperty("User-Agent", "OFA-Android-3.2");
         try {
             if (connection.getResponseCode() != 200) {
                 throw new IOException("GitHub public API returned HTTP " + connection.getResponseCode());
@@ -171,6 +193,83 @@ public final class MainActivity extends Activity {
         }
     }
 
+
+    private JSONObject fetchOFAWeatherSnapshot() throws Exception {
+        StringBuilder lat = new StringBuilder();
+        StringBuilder lon = new StringBuilder();
+        for (int i = 0; i < OFA_WEATHER_LAT.length; i++) {
+            if (i > 0) { lat.append(','); lon.append(','); }
+            lat.append(String.format(java.util.Locale.ROOT, "%.4f", OFA_WEATHER_LAT[i]));
+            lon.append(String.format(java.util.Locale.ROOT, "%.4f", OFA_WEATHER_LON[i]));
+        }
+        String endpoint = "https://api.open-meteo.com/v1/forecast?latitude=" + lat +
+            "&longitude=" + lon +
+            "&current=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation,weather_code,is_day" +
+            "&timezone=UTC&forecast_days=1";
+        HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
+        connection.setRequestMethod("GET");
+        connection.setConnectTimeout(8000);
+        connection.setReadTimeout(10000);
+        connection.setRequestProperty("Accept", "application/json");
+        connection.setRequestProperty("User-Agent", "OFA-Android-3.2");
+        try {
+            int code = connection.getResponseCode();
+            InputStream stream = code >= 200 && code < 300
+                ? connection.getInputStream() : connection.getErrorStream();
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            if (stream != null) {
+                try (InputStream in = stream) {
+                    byte[] buffer = new byte[8192]; int n;
+                    while ((n = in.read(buffer)) != -1) {
+                        if (output.size() + n > 450000) throw new IOException("Weather response too large");
+                        output.write(buffer, 0, n);
+                    }
+                }
+            }
+            if (code < 200 || code >= 300) throw new IOException("Weather provider HTTP " + code);
+            String raw = output.toString("UTF-8").trim();
+            JSONArray roots = raw.startsWith("[")
+                ? new JSONArray(raw)
+                : new JSONArray().put(new JSONObject(raw));
+            JSONArray samples = new JSONArray();
+            for (int i = 0; i < roots.length(); i++) {
+                JSONObject root = roots.optJSONObject(i);
+                if (root == null) continue;
+                JSONObject current = root.optJSONObject("current");
+                if (current == null) continue;
+                JSONObject sample = new JSONObject();
+                sample.put("lat", root.optDouble("latitude",
+                    OFA_WEATHER_LAT[Math.min(i, OFA_WEATHER_LAT.length - 1)]));
+                sample.put("lon", root.optDouble("longitude",
+                    OFA_WEATHER_LON[Math.min(i, OFA_WEATHER_LON.length - 1)]));
+                sample.put("cloud", current.optDouble("cloud_cover", 0.0));
+                sample.put("low", current.optDouble("cloud_cover_low", 0.0));
+                sample.put("mid", current.optDouble("cloud_cover_mid", 0.0));
+                sample.put("high", current.optDouble("cloud_cover_high", 0.0));
+                sample.put("precip", current.optDouble("precipitation", 0.0));
+                sample.put("code", current.optInt("weather_code", 0));
+                sample.put("isDay", current.optInt("is_day", 0));
+                samples.put(sample);
+            }
+            if (samples.length() < 12) throw new IOException("Weather grid incomplete");
+            return new JSONObject()
+                .put("ok", true)
+                .put("source", "Open-Meteo")
+                .put("fetchedAt", System.currentTimeMillis())
+                .put("stale", false)
+                .put("samples", samples);
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private void weatherCallback(JSONObject payload) {
+        final String js = "if(window.OFAWeatherReceive){window.OFAWeatherReceive(" +
+            JSONObject.quote(payload.toString()) + ");}";
+        runOnUiThread(() -> {
+            if (!isFinishing() && webView != null) webView.evaluateJavascript(js, null);
+        });
+    }
 
     private org.json.JSONArray readPublicComments(int issueNumber) throws Exception {
         if (issueNumber <= 0) return new org.json.JSONArray();
@@ -514,6 +613,43 @@ public final class MainActivity extends Activity {
     }
 
     private final class BackupBridge {
+        @JavascriptInterface public void refreshOFAWeather() {
+            diskExecutor.execute(() -> {
+                long now = System.currentTimeMillis();
+                String cached = cloudPrefs.getString(OFA_WEATHER_CACHE_KEY, "");
+                long cachedAt = cloudPrefs.getLong(OFA_WEATHER_TIME_KEY, 0L);
+                if (!cached.isEmpty() && now - cachedAt >= 0L && now - cachedAt < OFA_WEATHER_CACHE_MS) {
+                    try {
+                        JSONObject payload = new JSONObject(cached);
+                        payload.put("stale", false);
+                        weatherCallback(payload);
+                        return;
+                    } catch (Exception ignored) { }
+                }
+                try {
+                    JSONObject payload = fetchOFAWeatherSnapshot();
+                    cloudPrefs.edit()
+                        .putString(OFA_WEATHER_CACHE_KEY, payload.toString())
+                        .putLong(OFA_WEATHER_TIME_KEY, payload.optLong("fetchedAt", now))
+                        .apply();
+                    weatherCallback(payload);
+                } catch (Exception error) {
+                    if (!cached.isEmpty()) {
+                        try {
+                            JSONObject payload = new JSONObject(cached);
+                            payload.put("ok", true).put("stale", true);
+                            weatherCallback(payload);
+                            return;
+                        } catch (Exception ignored) { }
+                    }
+                    try {
+                        weatherCallback(new JSONObject().put("ok", false)
+                            .put("error", "Live weather model unavailable"));
+                    } catch (Exception ignored) { }
+                }
+            });
+        }
+
         @JavascriptInterface public void refreshOFABuildStatus() {
             diskExecutor.execute(() -> {
                 String payload;
