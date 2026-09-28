@@ -152,7 +152,7 @@ public final class MainActivity extends Activity {
         connection.setConnectTimeout(8000);
         connection.setReadTimeout(8000);
         connection.setRequestProperty("Accept", "application/vnd.github+json");
-        connection.setRequestProperty("User-Agent", "OFA-Android-2.1");
+        connection.setRequestProperty("User-Agent", "OFA-Android-2.2");
         try {
             if (connection.getResponseCode() != 200) {
                 throw new IOException("GitHub public API returned HTTP " + connection.getResponseCode());
