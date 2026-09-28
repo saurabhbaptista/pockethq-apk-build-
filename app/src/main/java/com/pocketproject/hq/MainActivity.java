@@ -131,7 +131,8 @@ public final class MainActivity extends Activity {
 
     private String fetchOFAEndpoint(String path) throws IOException {
         if (!"/actions/runs?per_page=15".equals(path) &&
-            !"/issues?state=open&per_page=80".equals(path)) {
+            !"/issues?state=open&per_page=80".equals(path) &&
+            !path.matches("/issues/\\d+/comments\\?per_page=30")) {
             throw new IOException("Endpoint not permitted");
         }
         java.net.HttpURLConnection connection = (java.net.HttpURLConnection)
@@ -157,6 +158,28 @@ public final class MainActivity extends Activity {
         } finally {
             connection.disconnect();
         }
+    }
+
+
+    private org.json.JSONArray readPublicComments(int issueNumber) throws Exception {
+        if (issueNumber <= 0) return new org.json.JSONArray();
+        org.json.JSONArray raw = new org.json.JSONArray(
+            fetchOFAEndpoint("/issues/" + issueNumber + "/comments?per_page=30"));
+        org.json.JSONArray clean = new org.json.JSONArray();
+        int start = Math.max(0, raw.length() - 20);
+        for (int i = start; i < raw.length(); ++i) {
+            org.json.JSONObject item = raw.optJSONObject(i);
+            if (item == null) continue;
+            org.json.JSONObject out = new org.json.JSONObject();
+            String body = item.optString("body", "");
+            if (body.length() > 1600) body = body.substring(0, 1600);
+            out.put("body", body);
+            out.put("createdAt", item.optString("created_at", ""));
+            org.json.JSONObject user = item.optJSONObject("user");
+            out.put("actor", user == null ? "OFA" : user.optString("login", "OFA"));
+            clean.put(out);
+        }
+        return clean;
     }
 
     private String publicWatchtowerSnapshot() throws Exception {
@@ -186,6 +209,8 @@ public final class MainActivity extends Activity {
             fetchOFAEndpoint("/issues?state=open&per_page=80"));
         org.json.JSONArray incidents = new org.json.JSONArray();
         org.json.JSONObject heartbeat = null;
+        int managerLogIssue = 0;
+        int workerLogIssue = 0;
         for (int i = 0; i < issues.length(); ++i) {
             org.json.JSONObject issue = issues.optJSONObject(i);
             if (issue == null) continue;
@@ -194,6 +219,10 @@ public final class MainActivity extends Activity {
                 heartbeat = new org.json.JSONObject();
                 heartbeat.put("number", issue.optInt("number"));
                 heartbeat.put("updatedAt", issue.optString("updated_at", ""));
+            } else if (title.startsWith("[OFA] Chief ↔ Managers")) {
+                managerLogIssue = issue.optInt("number");
+            } else if (title.startsWith("[OFA] Workers")) {
+                workerLogIssue = issue.optInt("number");
             } else if (title.startsWith("[OFA] Engineering")) {
                 org.json.JSONObject incident = new org.json.JSONObject();
                 incident.put("number", issue.optInt("number"));
@@ -201,10 +230,11 @@ public final class MainActivity extends Activity {
                 incident.put("createdAt", issue.optString("created_at", ""));
                 incidents.put(incident);
             }
-            if (incidents.length() >= 15) break;
         }
         result.put("heartbeat", heartbeat == null ? org.json.JSONObject.NULL : heartbeat);
         result.put("incidents", incidents);
+        result.put("managerMessages", readPublicComments(managerLogIssue));
+        result.put("workerMessages", readPublicComments(workerLogIssue));
         result.put("scope", "PUBLIC_GITHUB_BUILD_ONLY");
         return result.toString();
     }
