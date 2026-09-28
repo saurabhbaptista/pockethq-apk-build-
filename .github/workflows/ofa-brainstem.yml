@@ -43,11 +43,13 @@ jobs:
             gzip -t tests/test_brainstem.py.gz
             gzip -dc tests/test_brainstem.py.gz > tests/test_brainstem.py
           fi
-          python -m py_compile ofa/brainstem.py tests/test_brainstem.py
+          python -m py_compile ofa/brainstem.py tests/test_brainstem.py ofa/runtime/reasoning_runtime.py tests/test_reasoning_runtime.py
       - name: Unit tests - no secrets or external access
         env:
           GITHUB_TOKEN: ''
-        run: python -m unittest discover -s tests -p test_brainstem.py -v
+        run: |
+          python -m unittest discover -s tests -p test_brainstem.py -v
+          python -m unittest discover -s tests -p test_reasoning_runtime.py -v
       - name: Chief of Staff - investigate and take bounded actions
         if: github.event.inputs.mode != 'test'
         env:
