@@ -14,7 +14,8 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-WORKFLOW_NAME = "Build Pocket HQ offline Android shell"\nWORKFLOW_PATH = ".github/workflows/build-pocket-hq.yml"
+WORKFLOW_NAME = "Build Pocket HQ offline Android shell"
+WORKFLOW_PATH = ".github/workflows/build-pocket-hq.yml"
 STATUS_MARKER = "<!-- OFA-STATUS-V1 -->"
 MANAGER_LOG_MARKER = "<!-- OFA-MANAGER-LOG-V1 -->"
 WORKER_LOG_MARKER = "<!-- OFA-WORKER-LOG-V1 -->"
