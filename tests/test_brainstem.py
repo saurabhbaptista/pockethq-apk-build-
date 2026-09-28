@@ -76,7 +76,8 @@ class BrainstemTests(unittest.TestCase):
 
     def test_out_of_scope_or_forged_event_has_no_side_effects(self):
         for wrong in (dict(name="Not our workflow"),
-                      dict(head_repository={"full_name": "attacker/fork"}),\n                      dict(path=".github/workflows/unrelated-build.yml"),
+                      dict(head_repository={"full_name": "attacker/fork"}),
+                      dict(path=".github/workflows/unrelated-build.yml"),
                       dict(head_branch="feature"), dict(status="in_progress")):
             self.chief.process({**example(), **wrong})
         self.assertEqual(self.api.entries, [])
