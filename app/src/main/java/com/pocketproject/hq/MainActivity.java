@@ -152,7 +152,7 @@ public final class MainActivity extends Activity {
         connection.setConnectTimeout(8000);
         connection.setReadTimeout(8000);
         connection.setRequestProperty("Accept", "application/vnd.github+json");
-        connection.setRequestProperty("User-Agent", "OFA-Android-1.6");
+        connection.setRequestProperty("User-Agent", "OFA-Android-1.9");
         try {
             if (connection.getResponseCode() != 200) {
                 throw new IOException("GitHub public API returned HTTP " + connection.getResponseCode());
@@ -477,30 +477,26 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void refreshOffice() {
             diskExecutor.execute(() -> {
                 try {
-                    JSONObject result = new JSONObject();
-                    result.put("ok", true);
+                    JSONObject result = httpJson("POST",
+                        "/rest/v1/rpc/ofa_mobile_snapshot", new JSONObject(), true);
                     result.put("email", cloudPrefs.getString("email",""));
-                    result.put("agents", httpJson("GET",
-                        "/rest/v1/ofa_agents?select=code,name,department,role,status,authority_level,last_heartbeat_at&order=department.asc,name.asc",
-                        null, true).optJSONArray("items"));
-                    result.put("tasks", httpJson("GET",
-                        "/rest/v1/ofa_tasks?select=id,idempotency_key,objective,department,status,priority,risk_tier,authority_required,result_summary,error_summary,updated_at&order=priority.desc&limit=100",
-                        null, true).optJSONArray("items"));
-                    result.put("channels", httpJson("GET",
-                        "/rest/v1/ofa_channels?select=id,key,name,channel_type&order=created_at.asc",
-                        null, true).optJSONArray("items"));
-                    result.put("messages", httpJson("GET",
-                        "/rest/v1/ofa_messages?select=id,channel_id,sender_kind,sender_ref,message_type,body,created_at&order=created_at.desc&limit=160",
-                        null, true).optJSONArray("items"));
-                    result.put("events", httpJson("GET",
-                        "/rest/v1/ofa_events?select=id,event_type,summary,created_at&order=created_at.desc&limit=100",
-                        null, true).optJSONArray("items"));
-                    result.put("approvals", httpJson("GET",
-                        "/rest/v1/ofa_approvals?select=id,task_id,action_type,action_summary,status,created_at,expires_at&order=created_at.desc&limit=60",
-                        null, true).optJSONArray("items"));
                     result.put("fetchedAt", System.currentTimeMillis());
                     cloudCallback("office", result);
                 } catch (Exception e) { cloudCallback("office", cloudError(e)); }
+            });
+        }
+
+        @JavascriptInterface public void decideApproval(String approvalId, String decision) {
+            diskExecutor.execute(() -> {
+                try {
+                    String id = String.valueOf(approvalId == null ? "" : approvalId).trim();
+                    String choice = String.valueOf(decision == null ? "" : decision).trim().toLowerCase(java.util.Locale.ROOT);
+                    if (!id.matches("[0-9a-fA-F-]{36}")) throw new IOException("Invalid approval");
+                    if (!"approved".equals(choice) && !"rejected".equals(choice)) throw new IOException("Invalid decision");
+                    JSONObject response = httpJson("POST", "/rest/v1/rpc/ofa_ceo_decide_approval",
+                        new JSONObject().put("approval_id", id).put("decision", choice), true);
+                    cloudCallback("approval", new JSONObject().put("ok", true).put("result", response));
+                } catch (Exception e) { cloudCallback("approval", cloudError(e)); }
             });
         }
 
@@ -617,6 +613,18 @@ public final class MainActivity extends Activity {
                     }
                 });
             }
+        }
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.postDelayed(() -> {
+                if (!isFinishing() && webView != null) {
+                    webView.evaluateJavascript(
+                        "if(window.OFAAppResume){window.OFAAppResume();}", null);
+                }
+            }, 250);
         }
     }
 
