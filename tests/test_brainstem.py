@@ -3,7 +3,7 @@ import os
 import sys
 import unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from ofa.brainstem import Chief, STATUS_MARKER
+from ofa.brainstem import Chief, STATUS_MARKER, MANAGER_LOG_MARKER, WORKER_LOG_MARKER
 
 REPO = "saurabhbaptista/pockethq-apk-build-"
 
@@ -128,6 +128,22 @@ class BrainstemTests(unittest.TestCase):
         self.chief.sweep()
         self.assertEqual(len(self.api.entries), 1)
         self.assertIn("No completed", self.api.entries[0]["body"])
+
+    def test_event_dialogue_creates_separate_manager_and_worker_channels(self):
+        self.chief.process(example(), record_dialogue=True)
+        manager = next(i for i in self.api.entries if MANAGER_LOG_MARKER in i["body"])
+        worker = next(i for i in self.api.entries if WORKER_LOG_MARKER in i["body"])
+        self.assertNotEqual(manager["number"], worker["number"])
+        self.assertTrue(any(number == manager["number"] and "no intervention required" in body
+                            for number, body in self.api.comments))
+        self.assertTrue(any(number == worker["number"] and "SUCCESS" in body
+                            for number, body in self.api.comments))
+
+    def test_scheduled_sweep_does_not_spam_dialogue_channels(self):
+        self.api.mock_runs = [example()]
+        self.chief.sweep()
+        self.assertFalse(any(MANAGER_LOG_MARKER in i["body"] or WORKER_LOG_MARKER in i["body"]
+                             for i in self.api.entries))
 
 
 if __name__ == "__main__":
