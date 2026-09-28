@@ -7,31 +7,31 @@
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
       android:gravity="center_vertical" android:orientation="horizontal">
       <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-        android:text="POCKET HQ / FOCUS" android:textSize="11sp" android:textStyle="bold" android:letterSpacing=".13"
+        android:text="OFA / LIVE COMMAND" android:textSize="11sp" android:textStyle="bold" android:letterSpacing=".13"
         android:textColor="#B6F3D8"/>
       <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:text="● LOCAL" android:paddingLeft="9dp" android:paddingRight="9dp" android:paddingTop="4dp"
+        android:text="● PRIVATE" android:paddingLeft="9dp" android:paddingRight="9dp" android:paddingTop="4dp"
         android:paddingBottom="4dp" android:background="@drawable/widget_chip"
         android:textSize="10sp" android:textColor="#A6ECD7" android:textStyle="bold"/>
     </LinearLayout>
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:gravity="center_vertical" android:orientation="horizontal" android:layout_marginTop="6dp">
       <TextView android:id="@+id/widget_focus" android:layout_width="0dp" android:layout_weight="1"
-        android:layout_height="wrap_content" android:text="Open Pocket HQ"
+        android:layout_height="wrap_content" android:text="OFA · One For All"
         android:singleLine="true" android:ellipsize="end" android:textSize="23sp"
         android:fontFamily="sans" android:textStyle="bold" android:textColor="#F1F8F7"/>
       <TextView android:id="@+id/widget_focus_status" android:layout_width="wrap_content"
-        android:layout_height="wrap_content" android:text="ACTIVE" android:textSize="10sp"
+        android:layout_height="wrap_content" android:text="AGENTS" android:textSize="10sp"
         android:textColor="#B9D4CC" android:paddingLeft="8dp"/>
     </LinearLayout>
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="vertical" android:background="@drawable/widget_focus_card"
         android:padding="11dp" android:layout_marginTop="9dp">
       <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="NEXT ACTION" android:textSize="10sp" android:letterSpacing=".12"
+        android:text="CEO / CURRENT PRIORITY" android:textSize="10sp" android:letterSpacing=".12"
         android:textColor="#A6ECD7" android:textStyle="bold"/>
       <TextView android:id="@+id/widget_next" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="Open Pocket HQ to update this action." android:layout_marginTop="3dp"
+        android:text="OFA will surface the current organizational priority here." android:layout_marginTop="3dp"
         android:maxLines="3" android:ellipsize="end" android:textSize="12sp"
         android:lineSpacingExtra="2dp" android:textColor="#E4F1EE"/>
     </LinearLayout>
@@ -49,24 +49,24 @@
         <TextView android:id="@+id/widget_queued" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="6" android:textColor="#F5FAF9" android:textStyle="bold" android:textSize="22sp"/>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="QUEUED" android:letterSpacing=".08" android:textColor="#9AC4B7" android:textSize="9sp"/>
+            android:text="OPEN WORK" android:letterSpacing=".08" android:textColor="#9AC4B7" android:textSize="9sp"/>
       </LinearLayout>
       <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
         android:orientation="vertical">
         <TextView android:id="@+id/widget_done" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="1" android:textColor="#A6ECD7" android:textStyle="bold" android:textSize="22sp"/>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="SHIPPED" android:letterSpacing=".08" android:textColor="#9AC4B7" android:textSize="9sp"/>
+            android:text="APPROVALS" android:letterSpacing=".08" android:textColor="#9AC4B7" android:textSize="9sp"/>
       </LinearLayout>
     </LinearLayout>
     <LinearLayout android:id="@+id/widget_build_section" android:layout_width="match_parent"
       android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginTop="10dp"
       android:paddingTop="10dp" android:background="@drawable/widget_rule" android:visibility="gone">
       <TextView android:id="@+id/widget_build_status" android:layout_width="match_parent"
-        android:layout_height="wrap_content" android:text="UP NEXT" android:textColor="#A6ECD7"
+        android:layout_height="wrap_content" android:text="CURRENT FOCUS" android:textColor="#A6ECD7"
         android:letterSpacing=".12" android:textSize="10sp" android:textStyle="bold"/>
       <TextView android:id="@+id/widget_build" android:layout_width="match_parent"
-        android:layout_height="wrap_content" android:text="Choose your next small build"
+        android:layout_height="wrap_content" android:text="No current organizational focus"
         android:textColor="#F1F8F7" android:textSize="14sp" android:maxLines="2"
         android:ellipsize="end" android:layout_marginTop="4dp"/>
     </LinearLayout>
@@ -74,10 +74,10 @@
       android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginTop="10dp"
       android:visibility="gone">
       <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="FOLLOWING BUILD" android:letterSpacing=".12" android:textColor="#8FAEA7"
+        android:text="RECENT EVENT" android:letterSpacing=".12" android:textColor="#8FAEA7"
         android:textSize="10sp" android:textStyle="bold"/>
       <TextView android:id="@+id/widget_upcoming" android:layout_width="match_parent"
-        android:layout_height="wrap_content" android:text="Nothing else queued"
+        android:layout_height="wrap_content" android:text="No recent exception"
         android:textColor="#C8DDDA" android:textSize="12sp" android:maxLines="1"
         android:ellipsize="end" android:layout_marginTop="3dp"/>
     </LinearLayout>
@@ -85,7 +85,7 @@
       android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginTop="12dp"
       android:visibility="gone">
       <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-          android:text="PROJECT RADAR" android:letterSpacing=".12" android:textColor="#A6ECD7"
+          android:text="PROJECTS" android:letterSpacing=".12" android:textColor="#A6ECD7"
           android:textStyle="bold" android:textSize="10sp"/>
       <LinearLayout android:id="@+id/radar_row_1" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="vertical" android:layout_marginTop="8dp">
@@ -128,7 +128,7 @@
       android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginTop="12dp"
       android:visibility="gone">
       <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-          android:text="LAST ACTIVITY" android:letterSpacing=".12" android:textColor="#A6ECD7"
+          android:text="LAST EVIDENCE" android:letterSpacing=".12" android:textColor="#A6ECD7"
           android:textStyle="bold" android:textSize="10sp"/>
       <TextView android:id="@+id/widget_recent" android:layout_width="match_parent"
           android:layout_height="wrap_content" android:text="No recent activity"
@@ -136,6 +136,6 @@
           android:maxLines="2" android:ellipsize="end"/>
     </LinearLayout>
     <TextView android:id="@+id/widget_updated" android:layout_width="match_parent"
-        android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="LOCAL SNAPSHOT"
+        android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="OFA SNAPSHOT"
         android:textSize="9sp" android:letterSpacing=".04" android:textColor="#86A8A0"/>
 </LinearLayout>
