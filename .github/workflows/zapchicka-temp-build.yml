@@ -1,0 +1,67 @@
+name: ZapChicka temporary Android build
+
+on:
+  push:
+    branches:
+      - zapchicka-build-20260928
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Install Android SDK packages
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Unpack sanitized source
+        run: unzip -q zc-source-safe.zip
+
+      - name: Configure ZapChicka client backend
+        working-directory: ZapChicka_Android_MVP
+        run: |
+          {
+            echo "SUPABASE_URL=https://zwicnihksupsfoogtvtv.supabase.co"
+            echo "SUPABASE_PUBLISHABLE_KEY=sb_publishable_4L4Fh1h7kKfKxotqTptkvw_7QaxpWuX"
+          } > local.properties
+
+      - name: Unit tests
+        working-directory: ZapChicka_Android_MVP
+        run: gradle --no-daemon testDebugUnitTest
+
+      - name: Build unsigned release APK
+        working-directory: ZapChicka_Android_MVP
+        run: gradle --no-daemon assembleRelease
+
+      - name: Collect base APK and signing tools
+        run: |
+          mkdir -p out/tools/lib
+          APK="$(find ZapChicka_Android_MVP/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' | head -n1)"
+          test -n "$APK"
+          cp "$APK" out/ZapChicka-base-unsigned.apk
+          cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" out/tools/zipalign
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" out/tools/lib/apksigner.jar
+          LIBCXX="$(find "$ANDROID_HOME/build-tools/35.0.0" -type f -name 'libc++.so' | head -n1)"
+          test -n "$LIBCXX"
+          cp "$LIBCXX" out/tools/libc++.so
+          sha256sum out/ZapChicka-base-unsigned.apk > out/base.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZapChicka-build-base
+          path: out/
+          if-no-files-found: error
