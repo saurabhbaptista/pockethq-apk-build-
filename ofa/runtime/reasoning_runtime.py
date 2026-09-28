@@ -17,6 +17,7 @@ class RuntimePolicy:
     max_attempts: int = 2
     timeout_seconds: float = 30.0
     max_tool_calls: int = 4
+    require_evidence_for_completed: bool = False
 
 @dataclass
 class MemoryStore:
@@ -55,7 +56,10 @@ def run_task(task: Mapping[str, Any], provider: Provider | None, store: Store, t
                 out=tools[name](**dict(call.get("args",{})))
                 evidence.append({"tool":name,"result":out}); tool_count += 1
             if calls: continue
-            record={"status":response.get("status","completed"),"summary":str(response.get("summary",""))[:2000],"attempts":attempts,"tool_calls":tool_count,"usage":usage,"evidence":evidence}
+            final_status=str(response.get("status","completed"))
+            if final_status=="completed" and policy.require_evidence_for_completed and not evidence:
+                raise RuntimeError("completion_without_evidence")
+            record={"status":final_status,"summary":str(response.get("summary",""))[:2000],"attempts":attempts,"tool_calls":tool_count,"usage":usage,"evidence":evidence}
             store.persist(key,record); return {**record,"run_key":key}
         except (PermissionError, TimeoutError) as exc:
             last_error=str(exc); break
