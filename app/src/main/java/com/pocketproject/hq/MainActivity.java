@@ -174,7 +174,7 @@ public final class MainActivity extends Activity {
         connection.setConnectTimeout(8000);
         connection.setReadTimeout(8000);
         connection.setRequestProperty("Accept", "application/vnd.github+json");
-        connection.setRequestProperty("User-Agent", "OFA-Android-3.2");
+        connection.setRequestProperty("User-Agent", "OFA-Android-3.3");
         try {
             if (connection.getResponseCode() != 200) {
                 throw new IOException("GitHub public API returned HTTP " + connection.getResponseCode());
@@ -204,7 +204,7 @@ public final class MainActivity extends Activity {
         }
         String endpoint = "https://api.open-meteo.com/v1/forecast?latitude=" + lat +
             "&longitude=" + lon +
-            "&current=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation,weather_code,is_day" +
+            "&current=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation,weather_code,is_day,temperature_2m,apparent_temperature,wind_speed_10m" +
             "&timezone=UTC&forecast_days=1";
         HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
         connection.setRequestMethod("GET");
@@ -249,6 +249,9 @@ public final class MainActivity extends Activity {
                 sample.put("precip", current.optDouble("precipitation", 0.0));
                 sample.put("code", current.optInt("weather_code", 0));
                 sample.put("isDay", current.optInt("is_day", 0));
+                sample.put("temp", current.optDouble("temperature_2m", Double.NaN));
+                sample.put("apparent", current.optDouble("apparent_temperature", Double.NaN));
+                sample.put("wind", current.optDouble("wind_speed_10m", Double.NaN));
                 samples.put(sample);
             }
             if (samples.length() < 12) throw new IOException("Weather grid incomplete");
