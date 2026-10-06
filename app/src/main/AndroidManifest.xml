@@ -4,8 +4,15 @@
  <application android:allowBackup="false" android:usesCleartextTraffic="false"
     android:label="OFA - One For All" android:icon="@drawable/icon" android:theme="@style/PocketTheme">
    <activity android:name=".MainActivity" android:exported="true"
+      android:launchMode="singleTop"
       android:configChanges="keyboardHidden|orientation|screenSize" android:windowSoftInputMode="adjustResize">
       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="com.pocketproject.hq" android:host="auth-callback"/>
+      </intent-filter>
    </activity>
  <receiver android:name=".WidgetProvider" android:exported="true">
     <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
