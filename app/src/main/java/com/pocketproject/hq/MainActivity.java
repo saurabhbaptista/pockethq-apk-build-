@@ -50,6 +50,8 @@ public final class MainActivity extends Activity {
     private final ExecutorService diskExecutor = Executors.newSingleThreadExecutor();
     private static final String OFA_CLOUD_PREFS = "ofa.cloud.session.v1";
     private static final String OFA_ALLOWED_BASE_SHA256 = "65f21056a7092d5dd1a2fd49c5efbf86ff6245952301e50dd51dd5f9a9280f37";
+    private static final String OFA_AUTH_REDIRECT = "com.pocketproject.hq://auth-callback";
+    private static final String OFA_AUTH_SIGNUP_PATH = "/auth/v1/signup?redirect_to=com.pocketproject.hq%3A%2F%2Fauth-callback";
     private SharedPreferences cloudPrefs;
 
     @Override public void onCreate(Bundle state) {
@@ -124,6 +126,66 @@ public final class MainActivity extends Activity {
                 "Pocket HQ could not open its bundled interface. Please reinstall the app.</body>",
                 "text/html", "UTF-8", null);
         }
+        handleAuthRedirect(getIntent());
+    }
+
+    private void handleAuthRedirect(Intent intent) {
+        if (intent == null) return;
+        Uri data = intent.getData();
+        if (data == null ||
+            !"com.pocketproject.hq".equals(data.getScheme()) ||
+            !"auth-callback".equals(data.getHost())) return;
+
+        try {
+            String fragment = data.getFragment();
+            Uri fragmentUri = fragment == null || fragment.isEmpty()
+                ? null
+                : Uri.parse("https://pockethq.invalid/?" + fragment);
+
+            String error = data.getQueryParameter("error_description");
+            if ((error == null || error.isEmpty()) && fragmentUri != null) {
+                error = fragmentUri.getQueryParameter("error_description");
+            }
+            if (error != null && !error.isEmpty()) {
+                final JSONObject payload = new JSONObject()
+                    .put("ok", false)
+                    .put("signedIn", false)
+                    .put("authRedirect", true)
+                    .put("error", error.length() > 180 ? error.substring(0, 180) : error);
+                if (webView != null) webView.postDelayed(() -> cloudCallback("auth", payload), 350);
+                return;
+            }
+
+            String access = fragmentUri == null ? null : fragmentUri.getQueryParameter("access_token");
+            String refresh = fragmentUri == null ? null : fragmentUri.getQueryParameter("refresh_token");
+            String expires = fragmentUri == null ? null : fragmentUri.getQueryParameter("expires_in");
+
+            if (access != null && !access.isEmpty()) {
+                JSONObject session = new JSONObject().put("access_token", access);
+                if (refresh != null && !refresh.isEmpty()) session.put("refresh_token", refresh);
+                if (expires != null && !expires.isEmpty()) {
+                    try { session.put("expires_in", Long.parseLong(expires)); }
+                    catch (NumberFormatException ignored) { }
+                }
+                saveSession(session);
+                final JSONObject payload = new JSONObject()
+                    .put("ok", true)
+                    .put("signedIn", true)
+                    .put("authRedirect", true)
+                    .put("email", cloudPrefs.getString("email", ""));
+                if (webView != null) webView.postDelayed(() -> cloudCallback("auth", payload), 350);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Unable to process OFA auth callback", e);
+        } finally {
+            intent.setData(null);
+        }
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleAuthRedirect(intent);
     }
 
     private String readBundledHtml() throws IOException {
@@ -521,18 +583,44 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public String authState() {
             try {
                 JSONObject result = new JSONObject();
+                String access = cloudPrefs.getString("access_token","");
+                String refresh = cloudPrefs.getString("refresh_token","");
+                long expiresAt = cloudPrefs.getLong("expires_at_ms", 0L);
+                boolean accessFresh = !access.isEmpty() && System.currentTimeMillis() + 60000L < expiresAt;
                 result.put("configured", !cloudPrefs.getString("base_url","").isEmpty());
-                result.put("signedIn", !cloudPrefs.getString("access_token","").isEmpty() ||
-                    !cloudPrefs.getString("refresh_token","").isEmpty());
+                result.put("signedIn", accessFresh || !refresh.isEmpty());
+                result.put("sessionNeedsRefresh", !refresh.isEmpty() && !accessFresh);
+                result.put("sessionExpiresAtMs", expiresAt);
                 result.put("email", cloudPrefs.getString("email",""));
                 return result.toString();
             } catch (Exception e) { return "{\"configured\":false,\"signedIn\":false}"; }
         }
 
+        @JavascriptInterface public void recoverSession() {
+            diskExecutor.execute(() -> {
+                try {
+                    String token = ensureAccessToken();
+                    JSONObject result = new JSONObject()
+                        .put("ok", true)
+                        .put("signedIn", !token.isEmpty())
+                        .put("sessionRecovered", !token.isEmpty())
+                        .put("email", cloudPrefs.getString("email",""));
+                    cloudCallback("auth", result);
+                } catch (Exception e) {
+                    JSONObject result = cloudError(e);
+                    try {
+                        result.put("signedIn", false)
+                              .put("sessionRecoveryFailed", true);
+                    } catch (Exception ignored) { }
+                    cloudCallback("auth", result);
+                }
+            });
+        }
+
         @JavascriptInterface public void signUp(String email, String password) {
             diskExecutor.execute(() -> {
                 try {
-                    JSONObject response = httpJsonNoAuth("POST", "/auth/v1/signup",
+                    JSONObject response = httpJsonNoAuth("POST", OFA_AUTH_SIGNUP_PATH,
                         new JSONObject().put("email", String.valueOf(email).trim())
                             .put("password", String.valueOf(password)));
                     saveSession(response);
