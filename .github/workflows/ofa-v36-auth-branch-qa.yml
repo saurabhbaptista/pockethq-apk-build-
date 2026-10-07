@@ -22,6 +22,22 @@ jobs:
           gradle-version: '8.9'
       - name: Compile isolated auth branch
         run: gradle --no-daemon --stacktrace :app:assembleRelease
-      - name: Verify package identity
+      - name: Verify package identity and stage unsigned private-injection payload
+        shell: bash
         run: |
-          "$ANDROID_HOME/build-tools/34.0.0/aapt2" dump badging app/build/outputs/apk/release/app-release-unsigned.apk | head -n 2
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/34.0.0"
+          "$BT/aapt2" dump badging app/build/outputs/apk/release/app-release-unsigned.apk | head -n 2
+          mkdir -p dist/lib64
+          "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk dist/OFA_v3_6_shell_aligned_unsigned.apk
+          "$BT/zipalign" -c -p 4 dist/OFA_v3_6_shell_aligned_unsigned.apk
+          cp "$BT/zipalign" dist/zipalign
+          cp "$BT/lib/apksigner.jar" dist/apksigner.jar
+          cp "$BT/lib64/libc++.so" dist/lib64/libc++.so
+          sha256sum dist/OFA_v3_6_shell_aligned_unsigned.apk dist/zipalign dist/apksigner.jar dist/lib64/libc++.so > dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ofa-v36-private-injection-payload
+          path: dist/
+          retention-days: 1
+          if-no-files-found: error
