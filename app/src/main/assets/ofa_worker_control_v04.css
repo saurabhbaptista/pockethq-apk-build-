@@ -1,0 +1,63 @@
+/* OFA v0.4 / Chief. Isolated additive panel, never a replacement app UI. */
+.ofa-wrk-root{
+  --ow-ink:#edf7fa; --ow-sub:#9dacb9; --ow-line:rgba(196,221,237,.12);
+  --ow-panel:#101c29; --ow-green:#a5f9df; --ow-red:#ffb5b7;
+  width:100%;box-sizing:border-box;color:var(--ow-ink);
+  font:400 14px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color-scheme:dark; max-width:1024px; padding:clamp(20px,4vw,42px);
+  background:radial-gradient(ellipse at 85% 0%,rgba(66,154,183,.12),transparent 42%),
+    linear-gradient(145deg,#09131e,#0a1824 70%,#0b1723);
+  border:1px solid var(--ow-line);border-radius:26px;box-shadow:0 26px 80px rgba(0,0,0,.22);
+}
+.ofa-wrk-root *{box-sizing:border-box}
+.ofa-wrk-head{display:flex;flex-direction:column;gap:7px;padding:0 0 25px}
+.ofa-wrk-eyebrow{font-size:10px;letter-spacing:.25em;color:#9cc3ca;font-weight:750}
+.ofa-wrk-head h2{font-size:clamp(24px,4vw,34px);font-weight:670;line-height:1.15;letter-spacing:-.05em;margin:3px 0}
+.ofa-wrk-lead{color:var(--ow-sub);font-size:13px;margin:0;max-width:440px}
+.ofa-wrk-pill{display:inline-flex;width:max-content;max-width:100%;align-items:center;gap:9px;margin-top:12px;
+  color:var(--ow-green);background:rgba(81,210,168,.06);
+  border:1px solid rgba(101,219,193,.19);border-radius:99px;
+  padding:9px 15px;font-size:10px;font-weight:730;letter-spacing:.09em}
+.ofa-wrk-pill:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.ofa-wrk-metrics,.ofa-wrk-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.ofa-wrk-metric{min-width:0;display:flex;flex-direction:column;gap:5px;padding:19px 15px;
+  background:rgba(255,255,255,.025);border:1px solid var(--ow-line);border-radius:16px}
+.ofa-wrk-metric strong{font-weight:630;letter-spacing:-.045em;font-size:clamp(14px,2vw,24px);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.ofa-wrk-small{font-size:11px;color:var(--ow-sub);line-height:1.4}
+.ofa-wrk-section{margin-top:26px;padding:23px;background:rgba(255,255,255,.024);
+  border:1px solid var(--ow-line);border-radius:20px}
+.ofa-wrk-section h3{font-size:14px;font-weight:680;letter-spacing:-.015em;margin:0 0 18px}
+.ofa-wrk-facts .ofa-wrk-metric{padding:12px;border:0;background:rgba(255,255,255,.023)}
+.ofa-wrk-facts .ofa-wrk-metric strong{font-size:12px;letter-spacing:0}
+.ofa-wrk-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:22px}
+.ofa-wrk-btn{font:650 12px/1.2 inherit;letter-spacing:.025em;min-height:43px;min-width:95px;
+  border-radius:11px;padding:10px 16px;border:1px solid var(--ow-line);
+  color:var(--ow-ink);background:rgba(255,255,255,.045);cursor:pointer;
+  transition:background .16s ease,transform .16s ease}
+.ofa-wrk-btn:hover:not(:disabled){background:rgba(255,255,255,.105);transform:translateY(-1px)}
+.ofa-wrk-btn:focus-visible{outline:2px solid var(--ow-green);outline-offset:3px}
+.ofa-wrk-btn:disabled{opacity:.35;cursor:not-allowed}
+.ofa-wrk-accent{background:#a5f9df;color:#091a1f;border-color:transparent}
+.ofa-wrk-accent:hover:not(:disabled){background:#c6ffeb}
+.ofa-wrk-danger{color:var(--ow-red);border-color:rgba(255,136,142,.2)}
+.ofa-wrk-ghost{background:transparent}
+.ofa-wrk-job{border-top:1px solid var(--ow-line);padding:18px 0;
+  display:flex;align-items:center;justify-content:space-between;gap:18px}
+.ofa-wrk-job:first-of-type{border-top:0}
+.ofa-wrk-jobcopy{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ofa-wrk-jobcopy strong{font-size:11px;letter-spacing:.1em}
+.ofa-wrk-jobactions{display:flex;gap:8px;flex-shrink:0}
+.ofa-wrk-jobactions .ofa-wrk-btn{min-width:0;min-height:36px;padding:8px 12px;font-size:11px}
+.ofa-wrk-empty,.ofa-wrk-muted{color:var(--ow-sub)}
+.ofa-wrk-foot{color:#8191a1;font-size:10px;margin-top:19px;letter-spacing:.01em}
+.ofa-wrk-error{padding:12px 16px;margin:0 0 17px;border-radius:12px;
+  border:1px solid rgba(255,160,160,.2);background:rgba(196,49,63,.08);color:#ffc0c0}
+@media(max-width:700px){.ofa-wrk-root{border-radius:20px;padding:22px}
+.ofa-wrk-metrics,.ofa-wrk-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ofa-wrk-section{padding:17px}
+.ofa-wrk-job{align-items:flex-start;flex-direction:column}
+.ofa-wrk-actions{justify-content:stretch}
+.ofa-wrk-actions .ofa-wrk-btn{flex:1 1 160px}
+}
+@media(prefers-reduced-motion:reduce){.ofa-wrk-btn{transition:none}}

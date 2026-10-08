@@ -664,6 +664,77 @@ public final class MainActivity extends Activity {
             });
         }
 
+        // OFA release v0.4 — Chief worker command APIs.
+        // These fixed RPC routes require the existing authenticated CEO session.
+        // No worker enable/revoke/shell operation is exposed to the WebView.
+        @JavascriptInterface public void refreshWorkerRelease() {
+            diskExecutor.execute(() -> {
+                try {
+                    JSONObject response = httpJson("POST",
+                        "/rest/v1/rpc/ofa_ceo_worker_release_snapshot_v1",
+                        new JSONObject(), true);
+                    cloudCallback("worker_release", new JSONObject()
+                        .put("ok", true).put("data", response));
+                } catch (Exception e) {
+                    cloudCallback("worker_release", cloudError(e));
+                }
+            });
+        }
+
+        @JavascriptInterface public void queueEvidenceJob(String requestId, String marker) {
+            diskExecutor.execute(() -> {
+                try {
+                    String rid = requestId == null ? "" : requestId.trim();
+                    String mk = marker == null ? "" : marker.trim();
+                    if (!rid.matches("[A-Za-z0-9_-]{12,80}") ||
+                        !mk.matches("[A-Za-z0-9_-]{8,80}")) {
+                        throw new IOException("Invalid evidence-only canary input");
+                    }
+                    JSONObject response = httpJson("POST",
+                        "/rest/v1/rpc/ofa_ceo_queue_evidence_job_v1",
+                        new JSONObject().put("p_request_id",rid)
+                            .put("p_marker",mk), true);
+                    cloudCallback("worker_queue", new JSONObject()
+                        .put("ok",true).put("data",response));
+                } catch (Exception e) {
+                    cloudCallback("worker_queue", cloudError(e));
+                }
+            });
+        }
+
+        @JavascriptInterface public void getEvidenceJob(String taskId) {
+            diskExecutor.execute(() -> {
+                try {
+                    String id = taskId == null ? "" : taskId.trim();
+                    java.util.UUID.fromString(id);
+                    JSONObject response = httpJson("POST",
+                        "/rest/v1/rpc/ofa_ceo_evidence_job_status_v1",
+                        new JSONObject().put("p_task_id", id), true);
+                    cloudCallback("worker_job", new JSONObject()
+                        .put("ok",true).put("data",response));
+                } catch (Exception e) {
+                    cloudCallback("worker_job", cloudError(e));
+                }
+            });
+        }
+
+        @JavascriptInterface public void cancelEvidenceJob(String taskId) {
+            diskExecutor.execute(() -> {
+                try {
+                    String id = taskId == null ? "" : taskId.trim();
+                    java.util.UUID.fromString(id);
+                    JSONObject response = httpJson("POST",
+                        "/rest/v1/rpc/ofa_ceo_cancel_evidence_job_v1",
+                        new JSONObject().put("p_task_id",id)
+                            .put("p_reason","ceo_cancel"), true);
+                    cloudCallback("worker_cancel",new JSONObject()
+                        .put("ok",true).put("data",response));
+                } catch (Exception e) {
+                    cloudCallback("worker_cancel",cloudError(e));
+                }
+            });
+        }
+
         @JavascriptInterface public void refreshOffice() {
             diskExecutor.execute(() -> {
                 try {
