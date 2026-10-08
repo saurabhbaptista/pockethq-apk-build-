@@ -39,5 +39,5 @@ jobs:
         with:
           name: ofa-v36-private-injection-payload
           path: dist/
-          retention-days: 1
+          retention-days: 4
           if-no-files-found: error
