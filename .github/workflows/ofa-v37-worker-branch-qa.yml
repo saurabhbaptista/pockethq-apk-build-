@@ -1,0 +1,63 @@
+name: OFA v3.7 Restricted Worker Candidate QA
+on:
+  push:
+    branches: [ofa/v37-chief-worker-controls-20261009]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-public-shell:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test native-bridge UI contract
+        run: |
+          set -euo pipefail
+          node --check app/src/main/assets/ofa_worker_control_v04.js
+          node tests/test_worker_control_v04.js
+          grep -q "refreshWorkerRelease" app/src/main/java/com/pocketproject/hq/MainActivity.java
+          grep -q "queueEvidenceJob" app/src/main/java/com/pocketproject/hq/MainActivity.java
+          grep -q "cancelEvidenceJob" app/src/main/java/com/pocketproject/hq/MainActivity.java
+      - name: Confirm private OFA UI not published
+        run: |
+          set -euo pipefail
+          grep -q "Public build placeholder" app/src/main/assets/index.html
+          test "$(wc -c < app/src/main/assets/index.html)" -lt 2000
+          ! grep -q "OFA_PRIVATE_PANEL" app/src/main/assets/index.html
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@035682743ab223ec9c6169af09811dff8247e520
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compile public-only version 3.7 candidate
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Verify version and prepare owner-only offline private injection
+        shell: bash
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/34.0.0"
+          PKG="app/build/outputs/apk/release/app-release-unsigned.apk"
+          "$BT/aapt2" dump badging "$PKG" | head -n 2
+          "$BT/aapt2" dump badging "$PKG" | grep -q "versionCode='22'"
+          mkdir -p dist/lib64
+          "$BT/zipalign" -f -p 4 "$PKG" dist/OFA_v37_shell_aligned_unsigned.apk
+          "$BT/zipalign" -c -p 4 dist/OFA_v37_shell_aligned_unsigned.apk
+          cp "$BT/zipalign" dist/zipalign
+          cp "$BT/lib/apksigner.jar" dist/apksigner.jar
+          cp "$BT/lib64/libc++.so" dist/lib64/libc++.so
+          sha256sum dist/OFA_v37_shell_aligned_unsigned.apk dist/zipalign dist/apksigner.jar dist/lib64/libc++.so > dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ofa-v37-public-shell-offline-signing-toolkit
+          path: dist/
+          retention-days: 2
+          if-no-files-found: error
