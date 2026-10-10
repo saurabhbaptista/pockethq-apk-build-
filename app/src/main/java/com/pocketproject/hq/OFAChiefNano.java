@@ -29,21 +29,10 @@ public final class OFAChiefNano {
             .put("can_execute", false).put("model", "Gemini Nano / AICore");
     }
 
-    /** Called only after the owner explicitly taps Download AI Model in OFA. */
-    public static void downloadModel(DownloadCallback callback) throws Exception {
-        GenerativeModelFutures client = model();
-        int status = client.checkStatus().get(20, TimeUnit.SECONDS);
-        if (status != FeatureStatus.DOWNLOADABLE) {
-            throw new IllegalStateException("MODEL_NOT_DOWNLOADABLE");
-        }
-        // Google's AICore service owns model assets; OFA never receives a model URL
-        // or a general-purpose download permission. This worker waits for completion
-        // rather than treating download-started as a successful installation.
-        client.download(callback).get(35, TimeUnit.MINUTES);
-        if (client.checkStatus().get(30, TimeUnit.SECONDS)
-                != FeatureStatus.AVAILABLE) {
-            throw new IllegalStateException("MODEL_NOT_AVAILABLE_AFTER_DOWNLOAD");
-        }
+    /** Explicit owner-initiated AICore request, returning immediately with a future. */
+    public static com.google.common.util.concurrent.ListenableFuture<Void> beginDownload(
+            DownloadCallback callback) {
+        return model().download(callback);
     }
 
     public static JSONObject answer(String question) throws Exception {
