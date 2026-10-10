@@ -774,38 +774,81 @@ public final class MainActivity extends Activity {
                     if (!nanoForeground.get()) throw new IOException("OFA_NOT_FOREGROUND");
                     if (cloudPrefs == null || cloudPrefs.getString("access_token", "").isEmpty())
                         throw new IOException("SIGN_IN_REQUIRED");
+                    String availability = OFAChiefNano.checkStatus().optString("availability", "");
+                    if ("AVAILABLE".equals(availability)) {
+                        nanoDownloadEvent("ready", 0L, 0L);
+                        nanoDownloadBusy.set(false);
+                        return;
+                    }
+                    if (!"DOWNLOADABLE".equals(availability)) {
+                        throw new IOException("AICORE_NOT_READY_TO_DOWNLOAD");
+                    }
                     java.util.concurrent.atomic.AtomicLong total =
                         new java.util.concurrent.atomic.AtomicLong(0L);
                     java.util.concurrent.atomic.AtomicLong latest =
                         new java.util.concurrent.atomic.AtomicLong(0L);
                     java.util.concurrent.atomic.AtomicLong reported =
                         new java.util.concurrent.atomic.AtomicLong(0L);
-                    nanoDownloadEvent("preparing", 0L, 0L);
-                    OFAChiefNano.downloadModel(new com.google.mlkit.genai.common.DownloadCallback() {
-                        @Override public void onDownloadStarted(long bytesToDownload) {
-                            total.set(Math.max(0L, bytesToDownload));
-                            nanoDownloadEvent("started", 0L, total.get());
-                        }
-                        @Override public void onDownloadProgress(long totalBytesDownloaded) {
-                            long done = Math.max(0L, totalBytesDownloaded);
-                            latest.set(done);
-                            if (done - reported.get() >= 2097152L || done >= total.get() && total.get() > 0L) {
-                                reported.set(done);
-                                nanoDownloadEvent("progress", done, total.get());
-                            }
-                        }
-                        @Override public void onDownloadCompleted() {
-                            nanoDownloadEvent("verifying", latest.get(), total.get());
-                        }
-                        @Override public void onDownloadFailed(com.google.mlkit.genai.common.GenAiException failure) {
-                            nanoDownloadEvent("failed", latest.get(), total.get());
+                    AtomicBoolean started = new AtomicBoolean(false);
+                    android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
+                    nanoDownloadEvent("waiting_for_aicore", 0L, 0L);
+                    // The API examples launch the AICore request on the main executor.
+                    // Never block the status/inference executor waiting for Google download.
+                    ui.post(() -> {
+                        try {
+                            com.google.common.util.concurrent.ListenableFuture<Void> future =
+                                OFAChiefNano.beginDownload(new com.google.mlkit.genai.common.DownloadCallback() {
+                                    @Override public void onDownloadStarted(long bytesToDownload) {
+                                        started.set(true);
+                                        total.set(Math.max(0L, bytesToDownload));
+                                        nanoDownloadEvent("started", 0L, total.get());
+                                    }
+                                    @Override public void onDownloadProgress(long totalBytesDownloaded) {
+                                        long done = Math.max(0L, totalBytesDownloaded);
+                                        latest.set(done);
+                                        if (done - reported.get() >= 2097152L ||
+                                            (total.get() > 0L && done >= total.get())) {
+                                            reported.set(done);
+                                            nanoDownloadEvent("progress", done, total.get());
+                                        }
+                                    }
+                                    @Override public void onDownloadCompleted() {
+                                        nanoDownloadEvent("verifying", latest.get(), total.get());
+                                    }
+                                    @Override public void onDownloadFailed(
+                                            com.google.mlkit.genai.common.GenAiException failure) {
+                                        nanoDownloadEvent("failed", latest.get(), total.get());
+                                    }
+                                });
+                            // Future completion is asynchronous; handle it away from UI.
+                            future.addListener(() -> {
+                                try {
+                                    future.get();
+                                    JSONObject status = OFAChiefNano.checkStatus();
+                                    if ("AVAILABLE".equals(status.optString("availability", ""))) {
+                                        nanoDownloadEvent("ready", latest.get(), total.get());
+                                    } else {
+                                        nanoDownloadEvent("failed", latest.get(), total.get());
+                                    }
+                                } catch (Exception failure) {
+                                    nanoDownloadEvent("failed", latest.get(), total.get());
+                                } finally {
+                                    nanoDownloadBusy.set(false);
+                                }
+                            }, nanoExecutor);
+                            // Explicitly distinguish waiting for AICore from verified bytes.
+                            ui.postDelayed(() -> {
+                                if (nanoDownloadBusy.get() && !started.get()) {
+                                    nanoDownloadEvent("waiting_for_aicore", 0L, total.get());
+                                }
+                            }, 60000L);
+                        } catch (Exception failure) {
+                            nanoDownloadEvent("failed", 0L, 0L);
+                            nanoDownloadBusy.set(false);
                         }
                     });
-                    // Only an AVAILABLE model earns a successful completion event.
-                    nanoDownloadEvent("ready", 0L, 0L);
                 } catch (Exception failure) {
                     nanoDownloadEvent("failed", 0L, 0L);
-                } finally {
                     nanoDownloadBusy.set(false);
                 }
             });
