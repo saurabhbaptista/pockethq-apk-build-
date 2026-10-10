@@ -50,6 +50,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService diskExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService nanoExecutor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean nanoBusy = new AtomicBoolean(false);
+    private final AtomicBoolean nanoDownloadBusy = new AtomicBoolean(false);
     private final AtomicBoolean nanoForeground = new AtomicBoolean(false);
     private static final String OFA_CLOUD_PREFS = "ofa.cloud.session.v1";
     private static final String OFA_ALLOWED_BASE_SHA256 = "65f21056a7092d5dd1a2fd49c5efbf86ff6245952301e50dd51dd5f9a9280f37";
@@ -747,6 +748,69 @@ public final class MainActivity extends Activity {
         }
 
         // Foreground-only on-device Gemini Nano. Read-only inference, no tool execution.
+        /** Explicitly owner-initiated AICore model download. Never auto-start. */
+        private void nanoDownloadEvent(String stage, long bytes, long total) {
+            try {
+                JSONObject result = new JSONObject();
+                result.put("ok", !"failed".equals(stage));
+                result.put("stage", stage);
+                result.put("downloaded_bytes", Math.max(0L, bytes));
+                result.put("total_bytes", Math.max(0L, total));
+                result.put("on_device", true);
+                result.put("can_execute", false);
+                cloudCallback("chief_nano_download", result);
+            } catch (Exception ignored) {
+                // Do not log URL, model internals, Auth state or personal data.
+            }
+        }
+
+        @JavascriptInterface public void chiefNanoDownload() {
+            if (!nanoDownloadBusy.compareAndSet(false, true)) {
+                nanoDownloadEvent("already_in_progress", 0L, 0L);
+                return;
+            }
+            nanoExecutor.execute(() -> {
+                try {
+                    if (!nanoForeground.get()) throw new IOException("OFA_NOT_FOREGROUND");
+                    if (cloudPrefs == null || cloudPrefs.getString("access_token", "").isEmpty())
+                        throw new IOException("SIGN_IN_REQUIRED");
+                    java.util.concurrent.atomic.AtomicLong total =
+                        new java.util.concurrent.atomic.AtomicLong(0L);
+                    java.util.concurrent.atomic.AtomicLong latest =
+                        new java.util.concurrent.atomic.AtomicLong(0L);
+                    java.util.concurrent.atomic.AtomicLong reported =
+                        new java.util.concurrent.atomic.AtomicLong(0L);
+                    nanoDownloadEvent("preparing", 0L, 0L);
+                    OFAChiefNano.downloadModel(new com.google.mlkit.genai.common.DownloadCallback() {
+                        @Override public void onDownloadStarted(long bytesToDownload) {
+                            total.set(Math.max(0L, bytesToDownload));
+                            nanoDownloadEvent("started", 0L, total.get());
+                        }
+                        @Override public void onDownloadProgress(long totalBytesDownloaded) {
+                            long done = Math.max(0L, totalBytesDownloaded);
+                            latest.set(done);
+                            if (done - reported.get() >= 2097152L || done >= total.get() && total.get() > 0L) {
+                                reported.set(done);
+                                nanoDownloadEvent("progress", done, total.get());
+                            }
+                        }
+                        @Override public void onDownloadCompleted() {
+                            nanoDownloadEvent("verifying", latest.get(), total.get());
+                        }
+                        @Override public void onDownloadFailed(com.google.mlkit.genai.common.GenAiException failure) {
+                            nanoDownloadEvent("failed", latest.get(), total.get());
+                        }
+                    });
+                    // Only an AVAILABLE model earns a successful completion event.
+                    nanoDownloadEvent("ready", 0L, 0L);
+                } catch (Exception failure) {
+                    nanoDownloadEvent("failed", 0L, 0L);
+                } finally {
+                    nanoDownloadBusy.set(false);
+                }
+            });
+        }
+
         @JavascriptInterface public void chiefNanoStatus() {
             nanoExecutor.execute(() -> {
                 try {
