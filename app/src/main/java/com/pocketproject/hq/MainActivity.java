@@ -755,16 +755,14 @@ public final class MainActivity extends Activity {
                         throw new IOException("SIGN_IN_REQUIRED");
                     cloudCallback("chief_nano_status", OFAChiefNano.checkStatus());
                 } catch (Exception e) {
-                    cloudCallback("chief_nano_status", new JSONObject()
-                        .put("ok", false).put("error", "ON_DEVICE_MODEL_UNAVAILABLE"));
+                    cloudCallback("chief_nano_status", cloudError(new IOException("ON_DEVICE_MODEL_UNAVAILABLE")));
                 }
             });
         }
 
         @JavascriptInterface public void askChiefNano(String question) {
             if (!nanoBusy.compareAndSet(false, true)) {
-                cloudCallback("chief_nano_answer", new JSONObject()
-                    .put("ok",false).put("error","ON_DEVICE_MODEL_BUSY"));
+                cloudCallback("chief_nano_answer", cloudError(new IOException("ON_DEVICE_MODEL_BUSY")));
                 return;
             }
             nanoExecutor.execute(() -> {
@@ -775,8 +773,7 @@ public final class MainActivity extends Activity {
                     cloudCallback("chief_nano_answer", OFAChiefNano.answer(question));
                 } catch (Exception e) {
                     // Do not leak app session, internal runtime or model paths.
-                    cloudCallback("chief_nano_answer", new JSONObject()
-                        .put("ok",false).put("error","ON_DEVICE_INFERENCE_UNAVAILABLE"));
+                    cloudCallback("chief_nano_answer", cloudError(new IOException("ON_DEVICE_INFERENCE_UNAVAILABLE")));
                 } finally {
                     nanoBusy.set(false);
                 }
