@@ -48,6 +48,9 @@ public final class MainActivity extends Activity {
     private byte[] pendingExport;
     private final AtomicBoolean saving = new AtomicBoolean(false);
     private final ExecutorService diskExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService nanoExecutor = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean nanoBusy = new AtomicBoolean(false);
+    private final AtomicBoolean nanoForeground = new AtomicBoolean(false);
     private static final String OFA_CLOUD_PREFS = "ofa.cloud.session.v1";
     private static final String OFA_ALLOWED_BASE_SHA256 = "65f21056a7092d5dd1a2fd49c5efbf86ff6245952301e50dd51dd5f9a9280f37";
     private static final String OFA_AUTH_REDIRECT = "com.pocketproject.hq://auth-callback";
@@ -743,6 +746,43 @@ public final class MainActivity extends Activity {
             });
         }
 
+        // Foreground-only on-device Gemini Nano. Read-only inference, no tool execution.
+        @JavascriptInterface public void chiefNanoStatus() {
+            nanoExecutor.execute(() -> {
+                try {
+                    if (!nanoForeground.get()) throw new IOException("OFA_NOT_FOREGROUND");
+                    if (cloudPrefs == null || cloudPrefs.getString("access_token","").isEmpty())
+                        throw new IOException("SIGN_IN_REQUIRED");
+                    cloudCallback("chief_nano_status", OFAChiefNano.checkStatus());
+                } catch (Exception e) {
+                    cloudCallback("chief_nano_status", new JSONObject()
+                        .put("ok", false).put("error", "ON_DEVICE_MODEL_UNAVAILABLE"));
+                }
+            });
+        }
+
+        @JavascriptInterface public void askChiefNano(String question) {
+            if (!nanoBusy.compareAndSet(false, true)) {
+                cloudCallback("chief_nano_answer", new JSONObject()
+                    .put("ok",false).put("error","ON_DEVICE_MODEL_BUSY"));
+                return;
+            }
+            nanoExecutor.execute(() -> {
+                try {
+                    if (!nanoForeground.get()) throw new IOException("OFA_NOT_FOREGROUND");
+                    if (cloudPrefs == null || cloudPrefs.getString("access_token","").isEmpty())
+                        throw new IOException("SIGN_IN_REQUIRED");
+                    cloudCallback("chief_nano_answer", OFAChiefNano.answer(question));
+                } catch (Exception e) {
+                    // Do not leak app session, internal runtime or model paths.
+                    cloudCallback("chief_nano_answer", new JSONObject()
+                        .put("ok",false).put("error","ON_DEVICE_INFERENCE_UNAVAILABLE"));
+                } finally {
+                    nanoBusy.set(false);
+                }
+            });
+        }
+
         @JavascriptInterface public void refreshOffice() {
             diskExecutor.execute(() -> {
                 try {
@@ -924,6 +964,7 @@ public final class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        nanoForeground.set(true);
         if (webView != null) {
             webView.postDelayed(() -> {
                 if (!isFinishing() && webView != null) {
@@ -932,6 +973,11 @@ public final class MainActivity extends Activity {
                 }
             }, 250);
         }
+    }
+
+    @Override protected void onPause() {
+        nanoForeground.set(false);
+        super.onPause();
     }
 
     @Override protected void onDestroy() {
@@ -945,6 +991,7 @@ public final class MainActivity extends Activity {
             webView.destroy();
             webView = null;
         }
+        nanoExecutor.shutdownNow();
         diskExecutor.shutdown();
         super.onDestroy();
     }
