@@ -1,7 +1,7 @@
-name: OFA v3.7 Restricted Worker Candidate QA
+name: OFA v3.7.1 Chief Scalar Ack QA
 on:
   push:
-    branches: [ofa/v37-chief-worker-controls-20261009]
+    branches: [ofa/v38-chief-scalar-ack-20261010]
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,6 +20,7 @@ jobs:
           node --check app/src/main/assets/ofa_worker_control_v04.js
           node tests/test_worker_control_v04.js
           grep -q "refreshWorkerRelease" app/src/main/java/com/pocketproject/hq/MainActivity.java
+          grep -q '/rest/v1/rpc/ofa_ceo_message_to_chief".equals(path)' app/src/main/java/com/pocketproject/hq/MainActivity.java
           grep -q "queueEvidenceJob" app/src/main/java/com/pocketproject/hq/MainActivity.java
           grep -q "cancelEvidenceJob" app/src/main/java/com/pocketproject/hq/MainActivity.java
       - name: Confirm private OFA UI not published
@@ -47,17 +48,17 @@ jobs:
           BT="$ANDROID_HOME/build-tools/34.0.0"
           PKG="app/build/outputs/apk/release/app-release-unsigned.apk"
           "$BT/aapt2" dump badging "$PKG" | head -n 2
-          "$BT/aapt2" dump badging "$PKG" | grep -q "versionCode='22'"
+          "$BT/aapt2" dump badging "$PKG" | grep -q "versionCode='23'"
           mkdir -p dist/lib64
-          "$BT/zipalign" -f -p 4 "$PKG" dist/OFA_v37_shell_aligned_unsigned.apk
-          "$BT/zipalign" -c -p 4 dist/OFA_v37_shell_aligned_unsigned.apk
+          "$BT/zipalign" -f -p 4 "$PKG" dist/OFA_v38_shell_aligned_unsigned.apk
+          "$BT/zipalign" -c -p 4 dist/OFA_v38_shell_aligned_unsigned.apk
           cp "$BT/zipalign" dist/zipalign
           cp "$BT/lib/apksigner.jar" dist/apksigner.jar
           cp "$BT/lib64/libc++.so" dist/lib64/libc++.so
-          sha256sum dist/OFA_v37_shell_aligned_unsigned.apk dist/zipalign dist/apksigner.jar dist/lib64/libc++.so > dist/SHA256SUMS.txt
+          sha256sum dist/OFA_v38_shell_aligned_unsigned.apk dist/zipalign dist/apksigner.jar dist/lib64/libc++.so > dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ofa-v37-public-shell-offline-signing-toolkit
+          name: ofa-v38-public-shell-offline-signing-toolkit
           path: dist/
           retention-days: 2
           if-no-files-found: error
