@@ -483,6 +483,14 @@ public final class MainActivity extends Activity {
             throw new IOException(detail.length() > 180 ? detail.substring(0,180) : detail);
         }
         if (raw.isEmpty()) return new JSONObject();
+        // BIGINT-returning PostgREST RPCs send a scalar JSON number, not an object.
+        // A successful Chief request is already committed before this parse.
+        if ("/rest/v1/rpc/ofa_ceo_message_to_chief".equals(path)) {
+            if (!raw.matches("[1-9][0-9]{0,18}")) {
+                throw new IOException("Unexpected Chief acknowledgement shape");
+            }
+            return new JSONObject().put("message_id", Long.parseLong(raw));
+        }
         if (raw.startsWith("[")) return new JSONObject().put("items", new JSONArray(raw));
         return new JSONObject(raw);
     }
