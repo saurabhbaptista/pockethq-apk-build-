@@ -1,7 +1,7 @@
-name: OFA v3.8 On-device Chief Nano QA
+name: OFA 3.8.1 AICore Explicit Download QA
 on:
   push:
-    branches: [ofa/v40-on-device-chief-nano-20261010]
+    branches: [ofa/v41-nano-explicit-download-20261011]
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +23,8 @@ jobs:
           grep -q '/rest/v1/rpc/ofa_ceo_message_to_chief".equals(path)' app/src/main/java/com/pocketproject/hq/MainActivity.java
           grep -q 'chiefNanoStatus()' app/src/main/java/com/pocketproject/hq/MainActivity.java
           grep -q 'askChiefNano(String question)' app/src/main/java/com/pocketproject/hq/MainActivity.java
+          grep -q 'chiefNanoDownload()' app/src/main/java/com/pocketproject/hq/MainActivity.java
+          grep -q 'downloadModel(DownloadCallback callback)' app/src/main/java/com/pocketproject/hq/OFAChiefNano.java
           grep -q 'ON_DEVICE_MODEL_NOT_READY' app/src/main/java/com/pocketproject/hq/OFAChiefNano.java
           grep -q "queueEvidenceJob" app/src/main/java/com/pocketproject/hq/MainActivity.java
           grep -q "cancelEvidenceJob" app/src/main/java/com/pocketproject/hq/MainActivity.java
@@ -51,17 +53,17 @@ jobs:
           BT="$ANDROID_HOME/build-tools/34.0.0"
           PKG="app/build/outputs/apk/release/app-release-unsigned.apk"
           "$BT/aapt2" dump badging "$PKG" | head -n 2
-          "$BT/aapt2" dump badging "$PKG" | grep -q "versionCode='24'"
+          "$BT/aapt2" dump badging "$PKG" | grep -q "versionCode='25'"
           mkdir -p dist/lib64
-          "$BT/zipalign" -f -p 4 "$PKG" dist/OFA_v40_shell_aligned_unsigned.apk
-          "$BT/zipalign" -c -p 4 dist/OFA_v40_shell_aligned_unsigned.apk
+          "$BT/zipalign" -f -p 4 "$PKG" dist/OFA_v41_shell_aligned_unsigned.apk
+          "$BT/zipalign" -c -p 4 dist/OFA_v41_shell_aligned_unsigned.apk
           cp "$BT/zipalign" dist/zipalign
           cp "$BT/lib/apksigner.jar" dist/apksigner.jar
           cp "$BT/lib64/libc++.so" dist/lib64/libc++.so
-          sha256sum dist/OFA_v40_shell_aligned_unsigned.apk dist/zipalign dist/apksigner.jar dist/lib64/libc++.so > dist/SHA256SUMS.txt
+          sha256sum dist/OFA_v41_shell_aligned_unsigned.apk dist/zipalign dist/apksigner.jar dist/lib64/libc++.so > dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ofa-v40-public-shell-offline-signing-toolkit
+          name: ofa-v41-public-shell-offline-signing-toolkit
           path: dist/
           retention-days: 2
           if-no-files-found: error
