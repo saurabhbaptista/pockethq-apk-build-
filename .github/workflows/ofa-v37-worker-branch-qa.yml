@@ -21,9 +21,9 @@ jobs:
           node tests/test_worker_control_v04.js
           grep -q "refreshWorkerRelease" app/src/main/java/com/pocketproject/hq/MainActivity.java
           grep -q '/rest/v1/rpc/ofa_ceo_message_to_chief".equals(path)' app/src/main/java/com/pocketproject/hq/MainActivity.java
-          grep -q '"chiefNanoStatus"' app/src/main/java/com/pocketproject/hq/MainActivity.java
-          grep -q '"askChiefNano"' app/src/main/java/com/pocketproject/hq/MainActivity.java
-          grep -q '"ON_DEVICE_MODEL_NOT_READY"' app/src/main/java/com/pocketproject/hq/OFAChiefNano.java || grep -q '"ON_DEVICE_MODEL_NOT_READY"' app/src/main/java/com/pocketproject/hq/OFAChiefNano.java
+          grep -q 'chiefNanoStatus()' app/src/main/java/com/pocketproject/hq/MainActivity.java
+          grep -q 'askChiefNano(String question)' app/src/main/java/com/pocketproject/hq/MainActivity.java
+          grep -q 'ON_DEVICE_MODEL_NOT_READY' app/src/main/java/com/pocketproject/hq/OFAChiefNano.java
           grep -q "queueEvidenceJob" app/src/main/java/com/pocketproject/hq/MainActivity.java
           grep -q "cancelEvidenceJob" app/src/main/java/com/pocketproject/hq/MainActivity.java
       - name: Confirm private OFA UI not published
