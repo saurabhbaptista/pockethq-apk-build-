@@ -6,8 +6,8 @@ android {
    applicationId 'com.pocketproject.hq'
    minSdk 26
    targetSdk 34
-   versionCode 23
-   versionName '3.7.1-chief-fix'
+   versionCode 24
+   versionName '3.8.0-chief-nano-rc'
  }
  compileOptions {
    sourceCompatibility JavaVersion.VERSION_1_8
@@ -17,4 +17,9 @@ android {
    release { minifyEnabled false }
    debug { minifyEnabled false }
  }
+}
+
+// Private on-device inference uses AICore; no paid model service or API key.
+dependencies {
+    implementation 'com.google.mlkit:genai-prompt:1.0.0-beta4'
 }
