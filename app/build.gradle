@@ -6,8 +6,8 @@ android {
    applicationId 'com.pocketproject.hq'
    minSdk 26
    targetSdk 34
-   versionCode 22
-   versionName '3.7-worker-rc'
+   versionCode 23
+   versionName '3.7.1-chief-fix'
  }
  compileOptions {
    sourceCompatibility JavaVersion.VERSION_1_8
