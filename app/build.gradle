@@ -6,8 +6,8 @@ android {
    applicationId 'com.pocketproject.hq'
    minSdk 26
    targetSdk 34
-   versionCode 24
-   versionName '3.8.0-chief-nano-rc'
+   versionCode 25
+   versionName '3.8.1-nano-download-rc'
  }
  compileOptions {
    sourceCompatibility JavaVersion.VERSION_1_8
