@@ -1,0 +1,23 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "families": {
+      "$room": {
+        ".read": "auth != null && $room.matches(/^[A-Za-z0-9_-]{30,80}$/)",
+        "events": {
+          "$event": {
+            ".write": "auth != null && !data.exists() && newData.exists() && $event.matches(/^[A-Za-z0-9_-]{6,120}$/)",
+            ".validate": "newData.hasChildren(['id','player','mode','points','xp','correct','at']) && newData.child('id').val() == $event && newData.child('id').isString() && newData.child('player').isString() && newData.child('player').val().matches(/^(saurabh|may|mom)$/) && newData.child('mode').isString() && newData.child('mode').val().matches(/^(solo|relay|duel|challenge|study|daily|code)$/) && newData.child('points').isNumber() && newData.child('points').val() >= 0 && newData.child('points').val() <= 500 && newData.child('xp').isNumber() && newData.child('xp').val() >= 0 && newData.child('xp').val() <= 500 && newData.child('correct').isBoolean() && newData.child('at').isString() && newData.child('at').val().length <= 64"
+          }
+        },
+        "matches": {
+          "$match": {
+            ".write": "auth != null && !data.exists() && newData.exists() && $match.matches(/^[A-Za-z0-9_-]{6,120}$/)",
+            ".validate": "newData.hasChildren(['id','mode','players','scores','at']) && newData.child('id').val() == $match && newData.child('id').isString() && newData.child('mode').isString() && newData.child('mode').val().matches(/^(solo|relay|duel|challenge|study|daily|code)$/) && newData.child('at').isString() && newData.child('at').val().length <= 64 && newData.child('players').hasChildren(['0']) && newData.child('scores').hasChildren(['0'])"
+          }
+        }
+      }
+    }
+  }
+}
