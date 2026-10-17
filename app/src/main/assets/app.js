@@ -91,7 +91,7 @@ function makeQuestion(){const tier=game.tier||'medium',hard=tier==='hard',relaxe
 const pool=game.mode==='study'?TYPES:tier==='hard'?['math','sequence','logic','analogy','logic','sequence']:['math','sequence','memory','logic','analogy','word','math','sequence'];
 if(game.mode==='daily')return {...teasers.toQuestion(teasers.daily()),tier:'hard'};
 if(game.mode==='code')return window.BaptistaCodes.toQuestion(game.question-1);
-if(game.mode!=='study'&&Math.random()<(tier==='hard'?.42:.23)){
+if(game.mode!=='study'&&tier!=='easy'&&Math.random()<(tier==='hard'?.42:.23)){
 const filtered=teasers.BANK.filter(x=>tier==='hard'?['hourglass','ropes','bridge','clock','jugs'].includes(x.id):['clock','bulbs','coins','jugs','river'].includes(x.id));
 return {...teasers.toQuestion(pick(filtered)),tier};}
 let t=game.mode==='study'?game.studyQueue[game.question-1]:pick(pool);if(game.mode!=='study'&&t===game.lastType&&pool.length>1)t=pick(pool.filter(x=>x!==t));game.lastType=t;
