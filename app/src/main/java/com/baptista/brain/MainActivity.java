@@ -152,7 +152,7 @@ public final class MainActivity extends Activity {
         URL parsed=new URL(db);
         String host=parsed.getHost().toLowerCase(java.util.Locale.ROOT);
         if(!"https".equals(parsed.getProtocol())||parsed.getPort()!=-1||!parsed.getPath().matches("/?")||parsed.getQuery()!=null||parsed.getRef()!=null||
-           !(host.matches("[a-z0-9-]+\\.firebaseio\\.com")||host.matches("[a-z0-9-]+\\.firebasedatabase\\.app")))throw new IOException("Invalid Firebase database URL");
+           !(host.matches("[a-z0-9-]+(\\.[a-z0-9-]+)*\\.firebaseio\\.com")||host.matches("[a-z0-9-]+(\\.[a-z0-9-]+)*\\.firebasedatabase\\.app")))throw new IOException("Invalid Firebase database URL");
         boolean changed=!key.equals(apiKey)||!db.equals(database)||!r.equals(room);
         if(changed){generation++;uploaded.clear();HttpURLConnection c=streamConnection;if(c!=null)c.disconnect();
           String scope=key+"|"+db;
