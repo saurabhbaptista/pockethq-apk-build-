@@ -5,7 +5,7 @@ Android application ID `com.baptista.brain`, versionCode **4**, versionName `1.4
 ## Family-focused gameplay
 - Every timed mode now uses a **bonus window per question**. Clock reaching zero eliminates only the optional speed bonus, never the question, round or family member's turn. Untimed Academy and Daily remain untimed.
 - Rounds finish after a defined count: 10 solo, 12 relay (4 per family member), 15 versus (5 per person), 8 expert, 10 Academy, 1 daily and 3 Codebreaker (1 per person).
-- Difficulty progresses easy → medium → harder without sudden procedural jumps. Relaxed pacing adds bonus-window seconds and does not cap completion.
+- Regular 10-question rounds progress through 2 easy warm-ups, 6 intermediate puzzles and 2 harder questions. Family Relay uses 1 easy / 2 intermediate / 1 harder per person; Versus uses 1 easy / 3 intermediate / 1 harder per person. Relaxed pacing adds bonus-window seconds and does not cap completion.
 - New co-op Crack the Code: 12 hand-verified, uniquely solvable three-digit mysteries; 4 exact clues, limited guessing, two hints, worked explanations and rotation across all three profiles.
 - Retained illustrated brain teasers (clock, hourglass, switches, coins, ropes, jugs, bridge, river), memory/attention/logic/analogy/arithmetic, competition leaderboard, and zero-score Academy.
 
