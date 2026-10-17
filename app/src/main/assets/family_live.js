@@ -17,7 +17,7 @@ function setStatus(phase,details=''){
 function validate(cfg){if(!cfg||typeof cfg!=='object')throw Error('Enter a valid Firebase configuration');
  const apiKey=String(cfg.apiKey||'').trim(),db=String(cfg.databaseURL||'').trim().replace(/\/+$/,''),roomId=String(cfg.roomId||'').trim();
  if(!/^[A-Za-z0-9_-]{15,180}$/.test(apiKey))throw Error('Invalid Firebase Web API key');
- const url=new URL(db);if(url.protocol!=='https:'||url.port||url.username||url.password||url.search||url.hash||!/^[-a-z0-9]+\.(firebaseio\.com|firebasedatabase\.app)$/.test(url.hostname)||url.pathname!=='/')throw Error('Use a Firebase Realtime Database HTTPS root URL');
+ const url=new URL(db);if(url.protocol!=='https:'||url.port||url.username||url.password||url.search||url.hash||!/^[-a-z0-9]+(?:\.[a-z0-9-]+)*\.(firebaseio\.com|firebasedatabase\.app)$/.test(url.hostname)||url.pathname!=='/')throw Error('Use a Firebase Realtime Database HTTPS root URL');
  if(!/^[A-Za-z0-9_-]{30,80}$/.test(roomId))throw Error('Family room code must be 30–80 characters');
  return {apiKey,databaseURL:db,roomId};}
 function makeRoom(){if(!crypto?.getRandomValues)throw Error('Secure random generator unavailable');const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);return Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join('');}
